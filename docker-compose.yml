@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: muscle_training
+      POSTGRES_USER: muscle_app
+      POSTGRES_PASSWORD: muscle_app_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U muscle_app -d muscle_training"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      args:
+        BASE_PATH: /
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://muscle_app:muscle_app_dev@db:5432/muscle_training
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

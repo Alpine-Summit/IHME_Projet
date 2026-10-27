@@ -1,0 +1,59 @@
+name: Construire et publier l’image
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Déployer cette version après construction
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Installer les dépendances backend
+        run: npm install
+      - name: Installer les dépendances frontend
+        run: npm ci --prefix frontend
+      - name: Vérifier le frontend
+        run: npm run lint --prefix frontend
+      - name: Connexion à GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Construire et publier
+        uses: docker/build-push-action@v7
+        id: build
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          build-args: BASE_PATH=${{ vars.IHME_BASE_PATH || '/' }}
+          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Déployer volontairement
+        if: github.event_name == 'workflow_dispatch' && inputs.deploy
+        env:
+          DEPLOY_URL: ${{ vars.IHME_DEPLOY_URL }}
+          DEPLOY_TOKEN: ${{ secrets.IHME_DEPLOY_TOKEN }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          python3 deploy/request.py

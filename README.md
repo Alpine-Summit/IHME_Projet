@@ -43,6 +43,42 @@ Application
 Exercices proposés
 ```
 
-## État du projet
+## Lancer le prototype
 
-Projet en cours de développement.
+Le frontend peut être lancé seul :
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Pour lancer l’API Express et le frontend compilé :
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+L’API répond sur `http://localhost:3000/api/health`.
+
+Avec Docker Compose, PostgreSQL et l’application démarrent ensemble :
+
+```bash
+docker compose up --build
+```
+
+Les exercices affichés sont encore des données de démonstration. PostgreSQL est préparé avec une première table dans `database/init.sql`; la prochaine étape sera d’y transférer les exercices et de faire lire cette table par l’API.
+
+## Déploiement
+
+Le projet reprend le principe du dépôt du professeur : GitHub Actions construit une image Docker compatible Linux, la publie dans GHCR et le déploiement est déclenché volontairement. Le client `deploy/request.py` transmet ensuite le digest immuable au serveur du cours.
+
+Dans GitHub, configurer dans **Settings → Secrets and variables → Actions** :
+
+- secret `IHME_DEPLOY_TOKEN` : jeton fourni par l’enseignant ;
+- variable `IHME_DEPLOY_URL` : URL privée terminée par `/__deploy/pNN` ;
+- variable `IHME_BASE_PATH` : chemin web attribué, par exemple `/mon-projet/`.
+
+Ces valeurs ne doivent jamais être écrites dans le dépôt. Après un push, vérifier la construction dans **Actions**, puis lancer manuellement le workflow avec **Déployer cette version après construction**.
