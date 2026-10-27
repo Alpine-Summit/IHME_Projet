@@ -44,7 +44,7 @@ jobs:
           platforms: linux/amd64
           push: true
           build-args: BASE_PATH=${{ vars.IHME_BASE_PATH || '/' }}
-          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          tags: ghcr.io/alpine-summit/ihme_projet:${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
