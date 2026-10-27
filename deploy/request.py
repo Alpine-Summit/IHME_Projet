@@ -40,13 +40,22 @@ def request_deployment(url, token, digest, registry_token=""):
         def redirect_request(self, *args):
             return None
 
-    with urllib.request.build_opener(NoRedirect()).open(
-        request, timeout=440
-    ) as response:
-        data = json.load(response)
-        if response.status != 200 or data.get("status") != "healthy":
-            raise ValueError("Version non saine.")
-        return data
+    try:
+        with urllib.request.build_opener(NoRedirect()).open(
+            request, timeout=440
+        ) as response:
+            data = json.load(response)
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")[:500]
+        detail = detail.replace(token, "[jeton masqué]")
+        raise ValueError(f"Service HTTP {error.code}: {detail}") from None
+
+    if response.status != 200 or data.get("status") != "healthy":
+        raise ValueError(
+            f"Service de déploiement: statut HTTP {response.status}, "
+            f"réponse {data.get('status', 'inconnue')}."
+        )
+    return data
 
 
 if __name__ == "__main__":
@@ -58,9 +67,9 @@ if __name__ == "__main__":
             os.environ.get("REGISTRY_TOKEN", ""),
         )
         print("Déploiement vérifié : " + result["project"] + " @ " + result["digest"])
-    except (ValueError, OSError, urllib.error.URLError):
+    except (ValueError, OSError, urllib.error.URLError) as error:
         print(
-            "Déploiement refusé ou indisponible. Vérifier les paramètres privés et le résumé du workflow.",
+            "Déploiement refusé ou indisponible: " + str(error),
             file=sys.stderr,
         )
         sys.exit(1)
