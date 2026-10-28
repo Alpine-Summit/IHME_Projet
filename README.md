@@ -83,6 +83,8 @@ docker-compose.yml          environnement local Node/PostgreSQL
 
 Les données personnelles restent dans le navigateur. Le backend Node.js et PostgreSQL sont conservés pour l’exécution Docker, la santé du service et l’évolution future du catalogue ; l’application locale ne dépend pas d’un compte distant. Move est un assistant : sa proposition n’impose jamais la séance finale.
 
+Le backend Node.js réutilise directement le moteur de `frontend/src/engine/workoutEngine.js` : il n’existe plus de seconde règle de génération. Le catalogue React est donc la source commune de la sélection, des prescriptions et du calcul de durée.
+
 ## Développement local
 
 Pré-requis : Node.js 24, npm et Docker Desktop si PostgreSQL est utilisé.
