@@ -22,3 +22,11 @@ test('estimated duration changes after an exercise is edited', () => {
   const edited = { ...workout, exercises: workout.exercises.map((exercise) => ({ ...exercise, sets: exercise.sets + 2, restSeconds: exercise.restSeconds + 30 })) }
   assert.ok(estimateWorkoutMinutes(edited) > estimateWorkoutMinutes(workout))
 })
+
+test('body mass gives only a conservative editable load range', () => {
+  const workout = generateWorkout({ ...profile, bodyMass: 70 }, { objective: 'force', duration: 45 })
+  const loadedExercise = workout.exercises.find((exercise) => exercise.loadSuggestion)
+  assert.ok(loadedExercise)
+  assert.ok(loadedExercise.loadSuggestion.minKg < loadedExercise.loadSuggestion.maxKg)
+  assert.equal(generateWorkout(profile, { objective: 'force', duration: 45 }).exercises.some((exercise) => exercise.loadSuggestion), false)
+})

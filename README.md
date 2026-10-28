@@ -14,6 +14,7 @@ Le moteur sportif est déterministe et local : aucune API d’IA, aucun compte e
 - échauffement, consignes, précautions et variantes ;
 - édition d’une séance : ajout, suppression, déplacement, séries, répétitions, repos et charge ;
 - recalcul de la durée estimée avec alerte si la cible est dépassée ;
+- fourchette de charge externe indicative, calculée prudemment selon le poids, le niveau et la famille de mouvement ;
 - mode entraînement avec exercice courant et performances réellement réalisées ;
 - calendrier mensuel, planification, historique et statuts `generated`, `planned`, `started`, `completed` ;
 - sauvegarde persistante dans IndexedDB ;
@@ -21,6 +22,8 @@ Le moteur sportif est déterministe et local : aucune API d’IA, aucun compte e
 - interface responsive et accessible sur mobile et ordinateur.
 
 La masse corporelle ne suffit jamais à déduire une charge optimale. Les charges externes sont saisies et ajustées par l’utilisateur. Les recommandations sont pédagogiques et ne remplacent pas l’avis d’un professionnel de santé ou d’un entraîneur qualifié.
+
+Les fourchettes de charge sont des points de départ, jamais des prescriptions. Elles sont volontairement prudentes et disparaissent si le poids n’est pas renseigné ou si la charge d’une machine n’est pas comparable. L’utilisateur commence par le bas de la fourchette, garde environ 2 à 3 répétitions en réserve et réduit la charge si la technique se dégrade. Cette logique s’inspire des recommandations relatives à l’intensité de la [NSCA](https://dxpprod.nsca.com/education/articles/nsca-coach/using-intensity-based-on-sets-and-repetitions-over-50-years-of-experience-a-brief-overview/) et du consensus expert sur le choix des exercices chez les débutants ([Delphi study](https://pmc.ncbi.nlm.nih.gov/articles/PMC11873903/)). Les standards exprimés en multiples du poids du corps, comme ceux de [BarBend](https://barbend.com/squat-standards/), servent uniquement de repères de niveau et ne sont pas utilisés comme charges d’entraînement automatiques.
 
 ## Architecture
 

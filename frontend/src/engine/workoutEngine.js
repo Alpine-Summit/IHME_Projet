@@ -33,7 +33,24 @@ export function estimateWorkoutMinutes(workout) {
   return (workout.warmup?.minutes || 0) + (workout.exercises || []).reduce((total, exercise) => total + estimateExerciseMinutes(exercise), 0)
 }
 
-export function prescribeExercise(exercise, objective, level) {
+function roundLoad(value) { return Math.max(0.5, Math.round(value * 2) / 2) }
+
+export function suggestExternalLoad(exercise, bodyMass, level, objective) {
+  const mass = Number(bodyMass)
+  if (!Number.isFinite(mass) || mass <= 0 || exercise.equipment.every((item) => item === 'Poids du corps') || exercise.equipment.includes('Machines')) return null
+  const levelRanges = {
+    debutant: [0.25, 0.4],
+    intermediaire: [0.4, 0.6],
+    avance: [0.55, 0.8],
+  }
+  const [low, high] = levelRanges[level] || levelRanges.debutant
+  let factors = exercise.group === 'Haut du corps' ? [low * 0.35, high * 0.35] : exercise.group === 'Tronc' ? [low * 0.2, high * 0.3] : [low, high]
+  if (objective === 'puissance' || objective === 'pliometrie') factors = [factors[0] * 0.5, factors[1] * 0.5]
+  if (exercise.name.includes('Curl') || exercise.name.includes('Élévations') || exercise.name.includes('Extension triceps')) factors = [low * 0.12, high * 0.18]
+  return { minKg: roundLoad(mass * factors[0]), maxKg: roundLoad(mass * factors[1]), note: 'charge externe totale indicative' }
+}
+
+export function prescribeExercise(exercise, objective, level, bodyMass) {
   const config = objectiveConfig(objective)
   const beginner = level === 'debutant'
   return {
@@ -52,6 +69,7 @@ export function prescribeExercise(exercise, objective, level) {
     restSeconds: beginner ? Math.max(60, config.restSeconds - 15) : config.restSeconds,
     difficulty: level,
     load: '',
+    loadSuggestion: suggestExternalLoad(exercise, bodyMass, level, objective),
     performance: [],
   }
 }
@@ -64,6 +82,7 @@ export function generateWorkout(profile, { objective = 'general', duration = 45,
     id: crypto.randomUUID(),
     title: `${config.label} — ${duration} min`,
     sport: profile.sport || 'Renforcement général',
+    bodyMass: Number(profile.bodyMass) || null,
     objective,
     targetDuration: Number(duration),
     scheduledFor: scheduledFor || null,
@@ -73,7 +92,7 @@ export function generateWorkout(profile, { objective = 'general', duration = 45,
     completedAt: null,
     warmup: warmupFor(profile.sport, objective),
     safety: objective === 'pliometrie' ? 'La qualité des réceptions prime. Réduisez le volume si elles deviennent bruyantes ou instables.' : 'Arrêtez en cas de douleur et choisissez une difficulté qui permet de garder une technique propre.',
-    exercises: selected.map((exercise) => prescribeExercise(exercise, objective, profile.level)),
+    exercises: selected.map((exercise) => prescribeExercise(exercise, objective, profile.level, profile.bodyMass)),
   }
   return { ...workout, estimatedMinutes: estimateWorkoutMinutes(workout) }
 }
