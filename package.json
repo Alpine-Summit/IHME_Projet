@@ -9,7 +9,7 @@
     "build": "npm --prefix frontend run build",
     "start": "node backend/server.js",
     "lint": "npm --prefix frontend run lint",
-    "test": "node --test backend/*.test.js"
+    "test": "node --test backend/*.test.js frontend/src/engine/*.test.js"
   },
   "dependencies": {
     "express": "^5.1.0",
