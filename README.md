@@ -1,84 +1,44 @@
-# Projet IHME
+# Move — préparation physique personnalisée
 
-## Présentation
+Application React/Vite de préparation physique avec un mode local sans compte. Le profil, les séances planifiées et l’historique sont enregistrés dans le navigateur de l’utilisateur avec `localStorage`.
 
-Cette App est une application web qui propose des idées d'exercices de musculation et de renforcement musculaire pour un utilisateur.
+## Fonctionnalités
 
-L'utilisateur indique :
-- sa masse corporelle ;
-- son objectif (puissance, force, endurance);
-- les muscles qu'il souhaite travailler.
+- aucune création de compte obligatoire ;
+- profil sportif local : sport, niveau, objectifs, zones et matériel ;
+- séances de 30, 45 ou 60 minutes ;
+- force, puissance, endurance musculaire, pliométrie et renforcement général ;
+- échauffement, séries, répétitions, repos, difficulté et consignes ;
+- calendrier local, validation des séances réalisées et suppression ;
+- export/import JSON pour sauvegarder ou transférer les données ;
+- interface React/Vite responsive.
 
-L'application lui propose ensuite plusieurs exercices adaptés à ses choix.
+Les prescriptions sont des règles pédagogiques explicites. Aucune charge n’est déduite de la seule masse corporelle. Pour la pliométrie, la qualité de réception prime sur le volume. L’application n’est pas un dispositif médical.
 
-L'objectif n'est pas de créer une séance complète, mais simplement d'aider l'utilisateur à trouver des exercices lorsqu'il manque d'idées.
+## Lancement local
 
-## Objectifs
-
-- Proposer des exercices adaptés aux muscles sélectionnés.
-- Adapter les exercices à l'objectif de l'utilisateur.
-- Proposer une estimation de charge adaptée au poids de l'utilisateur lorsque cela est pertinent.
-- Présenter les exercices de manière simple et claire.
-
-## Technologies
-
-- React : frontend
-- Node.js : backend
-- PostgreSQL : base de données
-- Docker : environnement de développement
-
-## Fonctionnement
-
-```text
-Utilisateur
-     ↓
-Choix des muscles à travailler
-     +
-Choix de l'objectif
-     +
-Masse corporelle
-     ↓
-Application
-     ↓
-Exercices proposés
-```
-
-## Lancer le prototype
-
-Le frontend peut être lancé seul :
+Le mode local fonctionne sans PostgreSQL ni backend :
 
 ```bash
-cd frontend
-npm install
-npm run dev
+cd IHME_Projet
+npm ci --prefix frontend
+npm run dev:frontend
 ```
 
-Pour lancer l’API Express et le frontend compilé :
+Ouvrir l’adresse affichée par Vite, généralement `http://localhost:5173`.
+
+Les données sont propres au navigateur et à l’ordinateur utilisés. Il faut exporter régulièrement le fichier `move-calendrier.json`, car une suppression des données du navigateur peut supprimer le calendrier.
+
+## Vérifications
 
 ```bash
-npm install
+npm test
+npm run lint
 npm run build
-npm start
 ```
 
-L’API répond sur `http://localhost:3000/api/health`.
-
-Avec Docker Compose, PostgreSQL et l’application démarrent ensemble :
-
-```bash
-docker compose up --build
-```
-
-Les exercices affichés sont encore des données de démonstration. PostgreSQL est préparé avec une première table dans `database/init.sql`; la prochaine étape sera d’y transférer les exercices et de faire lire cette table par l’API.
+Le backend Express/PostgreSQL reste présent dans le projet pour une future synchronisation facultative, mais il n’est pas requis par l’interface actuelle.
 
 ## Déploiement
 
-Le projet reprend le principe du dépôt du professeur : GitHub Actions construit une image Docker compatible Linux, la publie dans GHCR et le déploiement est déclenché volontairement. Le client `deploy/request.py` transmet ensuite le digest immuable au serveur du cours.
-
-Dans GitHub, configurer dans **Settings → Secrets and variables → Actions** :
-
-- secret `IHME_DEPLOY_TOKEN` : jeton fourni par l’enseignant ;
-- variable `IHME_DEPLOY_URL` : URL privée terminée par `/__deploy/pNN` ;
-- variable `IHME_BASE_PATH` : chemin web attribué, par exemple `/mon-projet/`.
-
-Ces valeurs ne doivent jamais être écrites dans le dépôt. Après un push, vérifier la construction dans **Actions**, puis lancer manuellement le workflow avec **Déployer cette version après construction**.
+Le workflow [.github/workflows/publish.yml](./.github/workflows/publish.yml) conserve la méthode du dépôt pédagogique du professeur : image Docker publiée dans GHCR puis déploiement volontaire avec digest immuable. Les secrets ne sont pas versionnés.

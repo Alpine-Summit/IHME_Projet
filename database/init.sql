@@ -1,3 +1,26 @@
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS profiles (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  display_name VARCHAR(100) NOT NULL DEFAULT '', sport VARCHAR(80) NOT NULL DEFAULT '',
+  level VARCHAR(30) NOT NULL DEFAULT 'debutant', body_mass NUMERIC(5,2),
+  goals TEXT[] NOT NULL DEFAULT '{}', muscles TEXT[] NOT NULL DEFAULT '{}', equipment TEXT[] NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS exercises (
   id SERIAL PRIMARY KEY,
   name VARCHAR(120) NOT NULL UNIQUE,
@@ -8,6 +31,23 @@ CREATE TABLE IF NOT EXISTS exercises (
   description TEXT NOT NULL,
   easier_variant TEXT,
   harder_variant TEXT
+);
+
+ALTER TABLE exercises ADD COLUMN IF NOT EXISTS instruction TEXT NOT NULL DEFAULT '';
+
+CREATE TABLE IF NOT EXISTS workouts (
+  id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title VARCHAR(160) NOT NULL, objective VARCHAR(30) NOT NULL,
+  duration_minutes INTEGER NOT NULL CHECK (duration_minutes BETWEEN 30 AND 60), scheduled_for DATE,
+  status VARCHAR(20) NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'completed')),
+  completed_at TIMESTAMPTZ, notes TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS workout_exercises (
+  workout_id INTEGER NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
+  exercise_id INTEGER NOT NULL REFERENCES exercises(id), order_index INTEGER NOT NULL,
+  sets INTEGER NOT NULL, reps VARCHAR(30) NOT NULL, rest_seconds INTEGER NOT NULL, difficulty VARCHAR(30) NOT NULL,
+  PRIMARY KEY (workout_id, order_index)
 );
 
 ALTER TABLE exercises ADD COLUMN IF NOT EXISTS load_percentage NUMERIC(5, 2) NOT NULL DEFAULT 0;
