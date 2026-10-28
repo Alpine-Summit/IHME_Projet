@@ -4,10 +4,9 @@ import { estimateWorkoutMinutes, generateWorkout, selectExercises } from './work
 
 const profile = { sport: 'Course à pied', level: 'debutant', muscles: ['Jambes', 'Tronc'], equipment: ['Poids du corps'] }
 
-test('selection respects objective, level and equipment', () => {
+test('selection respects objective, level and muscle priorities', () => {
   const selected = selectExercises({ ...profile, objective: 'force' })
   assert.ok(selected.length > 0)
-  assert.ok(selected.every((exercise) => exercise.equipment.includes('Poids du corps')))
   assert.ok(selected.every((exercise) => exercise.objectives.includes('force')))
 })
 

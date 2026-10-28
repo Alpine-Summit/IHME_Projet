@@ -8,18 +8,16 @@ function warmupFor(sport, objective) {
   return { minutes: objective === 'pliometrie' || objective === 'puissance' ? 10 : 8, description: `${sportText}, puis deux répétitions faciles du premier mouvement.` }
 }
 
-export function selectExercises({ sport, objective, level, muscles = [], equipment = [] }) {
-  const requestedEquipment = new Set(equipment)
+export function selectExercises({ sport, objective, level, muscles = [] }) {
   const targetGroups = new Set(muscles)
   const rank = levelRank[level] ?? 0
   return EXERCISES
     .filter((exercise) => exercise.objectives.includes(objective))
     .filter((exercise) => exercise.sports.includes(sport) || exercise.sports.includes('Autre'))
     .filter((exercise) => exercise.levels.some((item) => levelRank[item] <= rank))
-    .filter((exercise) => exercise.equipment.some((item) => requestedEquipment.has(item)))
     .sort((a, b) => {
-      const aGroup = targetGroups.size > 0 && targetGroups.has(a.group) ? 1 : 0
-      const bGroup = targetGroups.size > 0 && targetGroups.has(b.group) ? 1 : 0
+      const aGroup = targetGroups.size > 0 && a.muscles.some((muscle) => targetGroups.has(muscle)) ? 1 : 0
+      const bGroup = targetGroups.size > 0 && b.muscles.some((muscle) => targetGroups.has(muscle)) ? 1 : 0
       return bGroup - aGroup
     })
 }

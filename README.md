@@ -1,12 +1,13 @@
 # Move — préparation physique personnalisée
 
-Move est une application React/Vite qui génère des séances de préparation physique à partir du sport, du niveau, de l’objectif, des groupes musculaires, du matériel et de la durée souhaitée.
+Move est une application React/Vite qui propose des séances de préparation physique à partir du sport, du niveau, de l’objectif, des groupes musculaires et de la durée souhaitée. Le catalogue considère que l’utilisateur peut disposer du matériel nécessaire ; chaque exercice affiche toutefois son matériel requis.
 
 Le moteur sportif est déterministe et local : aucune API d’IA, aucun compte et aucune connexion ne sont nécessaires pour utiliser l’application.
 
 ## Fonctionnalités
 
-- profil local : sport, niveau, masse facultative, groupes musculaires et matériel ;
+- profil local simplifié : nom, sport principal et masse facultative ;
+- sélection exhaustive des muscles ciblés directement au moment de la génération ;
 - objectifs distincts : force, puissance, endurance musculaire, pliométrie et renforcement général ;
 - catalogue d’exercices structuré et extensible dans `frontend/src/data/exercises.js` ;
 - moteur de sélection et de prescription dans `frontend/src/engine/workoutEngine.js` ;
@@ -34,7 +35,7 @@ Dockerfile                  image production frontend + API
 docker-compose.yml          environnement local Node/PostgreSQL
 ```
 
-Les données personnelles restent dans le navigateur. Le backend Node.js et PostgreSQL sont conservés pour l’exécution Docker, la santé du service et l’évolution future du catalogue ; l’application locale ne dépend pas d’un compte distant.
+Les données personnelles restent dans le navigateur. Le backend Node.js et PostgreSQL sont conservés pour l’exécution Docker, la santé du service et l’évolution future du catalogue ; l’application locale ne dépend pas d’un compte distant. Move est un assistant : sa proposition n’impose jamais la séance finale.
 
 ## Développement local
 
@@ -77,7 +78,7 @@ docker compose config
 docker build -t move:local .
 ```
 
-Les tests couvrent la prescription par objectif, le niveau et le matériel, la pliométrie débutant et le recalcul de durée. La CI exécute les tests, le lint, le build et la construction Docker.
+Les tests couvrent la prescription par objectif et niveau, la sélection liée aux muscles, la pliométrie débutant et le recalcul de durée. La CI exécute les tests, le lint, le build et la construction Docker.
 
 ## Sauvegarde des données
 
