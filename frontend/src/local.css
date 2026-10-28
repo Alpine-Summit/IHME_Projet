@@ -32,11 +32,23 @@
 .replace-row select { flex: 1; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: #fff; }
 .replace-row button:disabled { cursor: not-allowed; opacity: .5; }
 
+.welcome { background-image: linear-gradient(90deg, rgba(16, 32, 32, .97) 0%, rgba(16, 32, 32, .87) 52%, rgba(16, 32, 32, .66) 100%), url('./assets/apex-hero.svg'); background-position: center; background-size: cover; }
+.calendar-event { flex-direction: column; gap: 5px; min-width: 0; }
+.calendar-event > button:first-child { width: 100%; min-width: 0; }
+.calendar-event-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
+.calendar-validate { flex: 1; min-width: 0; padding: 6px 4px; border-radius: 6px; background: var(--accent-soft); color: #5f4b24; font-size: 9px; font-weight: 700; }
+.calendar-validate:hover { background: #f0dfbb; }
+.calendar-event-actions .calendar-delete { flex: 0 0 24px; }
+.calendar-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.calendar-day, .calendar-open, .calendar-open span { min-width: 0; }
+.workout-layout { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.exercise-card { min-width: 0; }
+
 /* Desktop refinement: a restrained editorial grid keeps every surface aligned. */
 @media (min-width: 821px) {
   .app { max-width: 1440px; padding: 30px 56px 64px; }
   .topbar { max-width: 1180px; margin: 0 auto 48px; min-height: 42px; }
-  .welcome { max-width: 1180px; min-height: 400px; margin: 0 auto 30px; padding: 72px 72px; background-image: linear-gradient(90deg, rgba(16, 32, 32, .97) 0%, rgba(16, 32, 32, .90) 48%, rgba(16, 32, 32, .56) 100%), url('./assets/apex-hero.svg'); background-position: center, center; background-size: cover; }
+  .welcome { max-width: 1180px; min-height: 400px; margin: 0 auto 30px; padding: 72px 72px; background-image: linear-gradient(90deg, rgba(16, 32, 32, .97) 0%, rgba(16, 32, 32, .87) 52%, rgba(16, 32, 32, .66) 100%), url('./assets/apex-hero.svg'); background-position: center; background-size: cover; }
   .welcome h1 { max-width: 760px; font-size: clamp(48px, 5vw, 72px); }
   .profile, .dashboard-grid { width: min(100%, 980px); margin-left: auto; margin-right: auto; }
   .profile { margin-bottom: 30px; }
@@ -61,7 +73,12 @@
   .profile .badge { white-space: normal; }
   .apex-logo { width: 174px; height: 47px; }
   .brand-button { min-width: auto; }
-  .welcome { background-image: linear-gradient(90deg, rgba(16, 32, 32, .94), rgba(16, 32, 32, .84)), url('./assets/apex-hero.svg'); background-position: center; background-size: cover; }
+  .welcome { background-image: linear-gradient(90deg, rgba(16, 32, 32, .97), rgba(16, 32, 32, .88)), url('./assets/apex-hero.svg'); background-position: center; background-size: cover; }
+  .calendar-day { padding: 5px 3px; }
+  .calendar-event-actions { gap: 2px; }
+  .calendar-validate { padding: 4px 1px; font-size: 0; }
+  .calendar-validate::after { content: '✓'; font-size: 11px; }
+  .calendar-event-actions .calendar-delete { flex-basis: 18px; width: 18px; height: 20px; }
   .replace-row { align-items: stretch; flex-direction: column; }
   .replace-row button { width: 100%; }
 }

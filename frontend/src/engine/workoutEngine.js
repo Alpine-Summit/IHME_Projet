@@ -74,14 +74,28 @@ export function generateWorkout(profile = {}, { objective = 'general', scheduled
   if (profile.firstName != null && (typeof profile.firstName !== 'string' || profile.firstName.length > 40)) throw new Error('Le prénom doit contenir au maximum 40 caractères.')
   const mass = profile?.bodyMass === '' || profile?.bodyMass == null ? null : Number(profile.bodyMass)
   if (mass !== null && (!Number.isFinite(mass) || mass < 20 || mass > 300)) throw new Error('La masse corporelle doit être comprise entre 20 et 300 kg.')
-  if (scheduledFor !== null && scheduledFor !== '' && !isValidDate(scheduledFor)) throw new Error('Choisissez une date de planification valide.')
+  if (scheduledFor == null || scheduledFor === '') throw new Error('Choisissez une date pour planifier la séance.')
+  if (!isValidDate(scheduledFor)) throw new Error('Choisissez une date de planification valide.')
   const config = objectiveConfig(objective)
   const candidates = selectExercises({ ...profile, objective, recentWorkouts })
   if (!candidates.length) throw new Error('Aucun exercice compatible avec vos critères. Essayez un autre objectif ou un autre groupe musculaire.')
   if (candidates.length < MIN_WORKOUT_EXERCISES) throw new Error(`Le catalogue doit proposer au moins ${MIN_WORKOUT_EXERCISES} exercices pour cet objectif.`)
   const targetGroups = new Set(profile.muscles || [])
   const targeted = targetGroups.size ? candidates.filter((exercise) => exercise.muscles.some((muscle) => targetGroups.has(muscle))) : candidates
-  const selected = [...targeted, ...candidates.filter((exercise) => !targeted.includes(exercise))].slice(0, Math.min(MAX_GENERATED_EXERCISES, candidates.length))
+  const selected = []
+  const coveredTargets = new Set()
+  for (const exercise of targeted) {
+    const newlyCovered = exercise.muscles.filter((muscle) => targetGroups.has(muscle) && !coveredTargets.has(muscle))
+    if (newlyCovered.length) {
+      selected.push(exercise)
+      newlyCovered.forEach((muscle) => coveredTargets.add(muscle))
+    }
+  }
+  const targetCount = Math.max(MAX_GENERATED_EXERCISES, selected.length)
+  for (const exercise of candidates) {
+    if (selected.length >= targetCount) break
+    if (!selected.includes(exercise)) selected.push(exercise)
+  }
   return {
     id: crypto.randomUUID(),
     title: title.trim() || `${config.label} · séance personnalisée`,
@@ -89,8 +103,8 @@ export function generateWorkout(profile = {}, { objective = 'general', scheduled
     objective,
     muscles: profile.muscles || [],
     variationNote: recentWorkouts.length ? 'Sélection alternée avec vos séances récentes pour limiter les répétitions.' : 'Première séance de cette préparation : les prochaines propositions varieront selon votre historique.',
-    scheduledFor: scheduledFor || null,
-    status: scheduledFor ? 'planned' : 'generated',
+    scheduledFor,
+    status: 'planned',
     createdAt: new Date().toISOString(),
     startedAt: null,
     completedAt: null,

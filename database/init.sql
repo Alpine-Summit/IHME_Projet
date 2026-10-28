@@ -50,13 +50,16 @@ ALTER TABLE exercises ADD COLUMN IF NOT EXISTS instruction TEXT NOT NULL DEFAULT
 CREATE TABLE IF NOT EXISTS workouts (
   id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title VARCHAR(160) NOT NULL, objective VARCHAR(30) NOT NULL,
-  scheduled_for DATE,
+  scheduled_for DATE NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'generated' CHECK (status IN ('generated', 'planned', 'started', 'completed')),
   completed_at TIMESTAMPTZ, notes TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS workouts_user_scheduled_idx ON workouts(user_id, scheduled_for);
 CREATE INDEX IF NOT EXISTS workouts_user_status_idx ON workouts(user_id, status);
+
+UPDATE workouts SET scheduled_for = created_at::date WHERE scheduled_for IS NULL;
+ALTER TABLE workouts ALTER COLUMN scheduled_for SET NOT NULL;
 
 ALTER TABLE profiles DROP COLUMN IF EXISTS sport;
 ALTER TABLE profiles DROP COLUMN IF EXISTS display_name;

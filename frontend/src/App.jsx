@@ -11,6 +11,12 @@ const emptyProfile = { firstName: '', bodyMass: '' }
 const initialData = { version: 4, profile: emptyProfile, workouts: [] }
 const tabs = [['home', 'Créer'], ['calendar', 'Calendrier'], ['history', 'Historique'], ['settings', 'Sauvegarde']]
 
+function isValidDateKey(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const timestamp = Date.parse(`${value}T00:00:00.000Z`)
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value
+}
+
 function normalizeData(stored) {
   const storedProfile = stored?.profile || {}
   const legacyName = storedProfile.firstName ?? storedProfile.displayName ?? ''
@@ -28,7 +34,13 @@ function normalizeData(stored) {
     const warmup = workout.warmup ? { description: workout.warmup.description } : { description: 'Mise en route progressive et mobilité des zones ciblées.' }
     const hasLegacyDurationTitle = /\b\d+\s*min\b/i.test(workout.title)
     const objectiveLabel = OBJECTIVES.find((item) => item.id === workout.objective)?.label || 'Renforcement général'
-    return { ...cleanWorkout, exercises, title: hasLegacyDurationTitle ? `${objectiveLabel} · séance` : workout.title, warmup }
+    const createdAt = typeof workout.createdAt === 'string' || typeof workout.createdAt === 'number'
+      ? new Date(workout.createdAt)
+      : new Date(Number.NaN)
+    const scheduledFor = isValidDateKey(workout.scheduledFor)
+      ? workout.scheduledFor
+      : localDateKey(Number.isFinite(createdAt.getTime()) ? createdAt : new Date())
+    return { ...cleanWorkout, exercises, title: hasLegacyDurationTitle ? `${objectiveLabel} · séance` : workout.title, warmup, scheduledFor }
   }) : []
   return { ...initialData, profile, workouts }
 }
@@ -38,6 +50,7 @@ function App() {
   const [ready, setReady] = useState(false)
   const [tab, setTab] = useState('home')
   const [activeWorkoutId, setActiveWorkoutId] = useState(null)
+  const [calendarFocusDate, setCalendarFocusDate] = useState(null)
   const [notice, setNotice] = useState('')
   const fileInput = useRef(null)
 
@@ -53,9 +66,26 @@ function App() {
 
   const activeWorkout = data.workouts.find((workout) => workout.id === activeWorkoutId)
   function updateProfile(profile) { setData((current) => ({ ...current, profile })) }
-  function addWorkout(workout) { setData((current) => ({ ...current, workouts: [workout, ...current.workouts] })); setActiveWorkoutId(workout.id); setTab('workout'); setNotice('Séance créée et enregistrée dans votre espace.') }
+  function addWorkout(workout) {
+    setData((current) => ({ ...current, workouts: [workout, ...current.workouts] }))
+    setCalendarFocusDate(workout.scheduledFor)
+    setTab('calendar')
+    setNotice('Séance créée et ajoutée au calendrier. Vous pourrez la modifier ou valider sa réalisation depuis cette page.')
+  }
   function updateWorkout(workout) { setData((current) => ({ ...current, workouts: current.workouts.map((item) => item.id === workout.id ? refreshWorkout(workout) : item) })) }
   function deleteWorkout(id) { if (window.confirm('Supprimer définitivement cette séance ?')) { setData((current) => ({ ...current, workouts: current.workouts.filter((item) => item.id !== id) })); setNotice('Séance supprimée.') } }
+  function validateWorkout(id) {
+    const workout = data.workouts.find((item) => item.id === id)
+    if (!workout || workout.status === 'completed') return
+    if (!window.confirm(`Valider « ${workout.title} » comme séance réalisée ?`)) return
+    setData((current) => ({
+      ...current,
+      workouts: current.workouts.map((item) => item.id === id
+        ? { ...item, status: 'completed', completedAt: new Date().toISOString() }
+        : item),
+    }))
+    setNotice('Séance validée et ajoutée à votre historique.')
+  }
   function openWorkout(id) { setActiveWorkoutId(id); setTab('workout') }
   function importFile(event) {
     const file = event.target.files?.[0]
@@ -68,7 +98,29 @@ function App() {
   }
 
   if (!ready) return <main className="app loading"><img className="apex-logo" src={apexLogo} alt="APEX Performance" /><p>Préparation de votre espace de performance…</p></main>
-  return <main className="app"><header className="topbar"><button className="brand brand-button" aria-label="APEX — accueil" onClick={() => setTab('home')}><img className="apex-logo" src={apexLogo} alt="APEX Performance" /></button><nav aria-label="Navigation principale">{tabs.map(([id, label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>)}</nav><div className="data-actions"><button onClick={() => exportData(data)}>Exporter</button><button onClick={() => fileInput.current?.click()}>Importer</button><input ref={fileInput} type="file" accept="application/json" hidden onChange={importFile} /></div></header>{notice && <div className="notice" role="status"><span>{notice}</span><button onClick={() => setNotice('')}>Fermer</button></div>}{tab === 'home' && <Home profile={data.profile} workouts={data.workouts} onProfileChange={updateProfile} onCreate={addWorkout} />}{tab === 'calendar' && <Calendar workouts={data.workouts} onOpen={openWorkout} onDelete={deleteWorkout} />}{tab === 'history' && <History workouts={data.workouts} onOpen={openWorkout} onDelete={deleteWorkout} />}{tab === 'settings' && <Settings data={data} onImport={() => fileInput.current?.click()} />}{tab === 'workout' && activeWorkout && <WorkoutEditor workout={activeWorkout} onChange={updateWorkout} onNotice={setNotice} onBack={() => setTab('calendar')} />}{tab === 'workout' && !activeWorkout && <Empty title="Séance introuvable" text="Retournez au calendrier pour choisir une séance." />}</main>
+  return (
+    <main className="app">
+      <header className="topbar">
+        <button className="brand brand-button" aria-label="APEX — accueil" onClick={() => setTab('home')}>
+          <img className="apex-logo" src={apexLogo} alt="APEX Performance" />
+        </button>
+        <nav aria-label="Navigation principale">
+          {tabs.map(([id, label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>)}
+        </nav>
+        <div className="data-actions">
+          <button onClick={() => exportData(data)}>Exporter</button>
+          <input ref={fileInput} type="file" accept="application/json" hidden onChange={importFile} />
+        </div>
+      </header>
+      {notice && <div className="notice" role="status"><span>{notice}</span><button onClick={() => setNotice('')}>Fermer</button></div>}
+      {tab === 'home' && <Home profile={data.profile} workouts={data.workouts} onProfileChange={updateProfile} onCreate={addWorkout} />}
+      {tab === 'calendar' && <Calendar workouts={data.workouts} focusDate={calendarFocusDate} onOpen={openWorkout} onDelete={deleteWorkout} onValidate={validateWorkout} />}
+      {tab === 'history' && <History workouts={data.workouts} onOpen={openWorkout} onDelete={deleteWorkout} />}
+      {tab === 'settings' && <Settings data={data} onImport={() => fileInput.current?.click()} />}
+      {tab === 'workout' && activeWorkout && <WorkoutEditor workout={activeWorkout} onChange={updateWorkout} onNotice={setNotice} onBack={() => setTab('calendar')} />}
+      {tab === 'workout' && !activeWorkout && <Empty title="Séance introuvable" text="Retournez au calendrier pour choisir une séance." />}
+    </main>
+  )
 }
 
 function Home({ profile, workouts, onProfileChange, onCreate }) {
@@ -76,7 +128,7 @@ function Home({ profile, workouts, onProfileChange, onCreate }) {
 }
 
 function Profile({ profile, onChange }) {
-  return <section className="panel profile profile-compact"><div className="panel-heading"><div><p className="eyebrow">PERSONNALISATION</p><h2>Un repère pour vos recommandations</h2><p className="muted">Les séances partent d’une pratique avancée. Votre masse corporelle sert à contextualiser des charges indicatives, jamais imposées.</p></div><span className="badge">Enregistré sur cet appareil</span></div><div className="profile-fields"><label className="weight-field">Prénom <span>(pour votre accueil)</span><input type="text" autoComplete="given-name" maxLength="40" placeholder="Ex. Alex" value={profile.firstName} onChange={(event) => onChange({ ...profile, firstName: event.target.value })} /></label><label className="weight-field">Masse corporelle <span>(facultative)</span><div className="input-suffix"><input type="number" min="20" max="300" step="0.1" placeholder="Ex. 72" value={profile.bodyMass} onChange={(event) => onChange({ ...profile, bodyMass: event.target.value })} /><b>kg</b></div><small>Les charges proposées restent indicatives et modifiables.</small></label></div></section>
+  return <section className="panel profile profile-compact"><div className="panel-heading"><div><p className="eyebrow">PERSONNALISATION</p><h2>Un repère pour vos recommandations</h2><p className="muted">Les séances partent d’une pratique avancée. Votre masse corporelle sert à contextualiser des charges indicatives, jamais imposées.</p></div><span className="badge">Enregistré sur cet appareil</span></div><div className="profile-fields"><label className="weight-field">Prénom <span>(pour votre accueil)</span><input type="text" autoComplete="given-name" maxLength="40" placeholder="Ex : Paul" value={profile.firstName} onChange={(event) => onChange({ ...profile, firstName: event.target.value })} /></label><label className="weight-field">Masse corporelle <span>(facultative)</span><div className="input-suffix"><input type="number" min="20" max="300" step="0.1" placeholder="Ex. 72" value={profile.bodyMass} onChange={(event) => onChange({ ...profile, bodyMass: event.target.value })} /><b>kg</b></div><small>Les charges proposées restent indicatives et modifiables.</small></label></div></section>
 }
 
 function ChoiceGroup({ title, values, selected, onToggle }) { return <fieldset><legend>{title}</legend><div className="chips">{values.map((value) => <label className={selected.includes(value) ? 'chip selected' : 'chip'} key={value}><input type="checkbox" checked={selected.includes(value)} onChange={() => onToggle(value)} />{value}</label>)}</div></fieldset> }
@@ -89,7 +141,24 @@ function Generator({ profile, history, onCreate }) {
   const [error, setError] = useState('')
   function toggleMuscle(value) { setMuscles((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]) }
   function submit(event) { event.preventDefault(); try { setError(''); onCreate(generateWorkout({ ...profile, muscles }, { objective, title, scheduledFor: date, recentWorkouts: history })) } catch (generationError) { setError(generationError.message) } }
-  return <section className="dashboard-grid"><form className="panel generator" onSubmit={submit}><div className="generator-heading"><div><p className="eyebrow">CRÉER UNE SÉANCE</p><h2>Votre prochaine séance, pensée pour vous.</h2></div><span className="step-label">APEX / 01</span></div><p className="muted">Définissez l’intention et les zones à travailler. APEX compose une trame de 4 à 6 mouvements que vous gardez entièrement sous votre contrôle.</p><label>Titre de la séance <span className="field-hint">(pour la retrouver facilement)</span><input type="text" maxLength="100" placeholder="Ex. Force — bas du corps" value={title} onChange={(event) => setTitle(event.target.value)} /></label><label>Objectif<select value={objective} onChange={(event) => setObjective(event.target.value)}>{OBJECTIVES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><ChoiceGroup title="Groupes musculaires à cibler" values={MUSCLE_GROUPS} selected={muscles} onToggle={toggleMuscle} /><label>Ajouter au calendrier <span className="field-hint">(facultatif)</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><button className="primary">Générer ma séance <span>→</span></button>{error && <p className="error" role="alert">{error}</p>}<p className="note">La sélection varie selon votre historique. Vous pourrez ajuster les exercices, séries, répétitions, repos et charges.</p></form></section>
+  return (
+    <section className="dashboard-grid">
+      <form className="panel generator" onSubmit={submit}>
+        <div className="generator-heading">
+          <div><p className="eyebrow">CRÉER UNE SÉANCE</p><h2>Votre prochaine séance, pensée pour vous.</h2></div>
+          <span className="step-label">APEX / 01</span>
+        </div>
+        <p className="muted">Définissez l’intention et les zones à travailler. APEX propose au moins 4 mouvements, et davantage si nécessaire pour couvrir les muscles sélectionnés.</p>
+        <label>Titre de la séance <span className="field-hint">(pour la retrouver facilement)</span><input type="text" maxLength="100" placeholder="Ex. Force — bas du corps" value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+        <label>Objectif<select value={objective} onChange={(event) => setObjective(event.target.value)}>{OBJECTIVES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+        <ChoiceGroup title="Groupes musculaires à cibler" values={MUSCLE_GROUPS} selected={muscles} onToggle={toggleMuscle} />
+        <label>Date de la séance <span className="field-hint">(obligatoire pour l’ajouter au calendrier)</span><input type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></label>
+        <button className="primary">Créer et planifier ma séance <span>→</span></button>
+        {error && <p className="error" role="alert">{error}</p>}
+        <p className="note">La séance sera enregistrée et affichée immédiatement à la date choisie. Vous pourrez ensuite la modifier ou valider sa réalisation depuis le calendrier.</p>
+      </form>
+    </section>
+  )
 }
 
 function WorkoutEditor({ workout, onChange, onBack, onNotice }) {
@@ -108,10 +177,65 @@ function WorkoutEditor({ workout, onChange, onBack, onNotice }) {
 }
 
 function localDateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` }
-function Calendar({ workouts, onOpen, onDelete }) { const [month, setMonth] = useState(new Date()); const days = useMemo(() => { const start = new Date(month.getFullYear(), month.getMonth(), 1); const end = new Date(month.getFullYear(), month.getMonth() + 1, 0); const offset = (start.getDay() + 6) % 7; return [...Array(offset).fill(null), ...Array.from({ length: end.getDate() }, (_, index) => new Date(month.getFullYear(), month.getMonth(), index + 1))] }, [month]); const dayWorkouts = (day) => workouts.filter((workout) => workout.scheduledFor === localDateKey(day)); return <section><div className="section-heading"><div><p className="eyebrow">CALENDRIER PERSONNEL</p><h1>Planifier et retrouver</h1><p className="muted">Les séances planifiées apparaissent ici automatiquement.</p></div><div className="row-actions"><button className="secondary" aria-label="Mois précédent" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>←</button><strong>{month.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</strong><button className="secondary" aria-label="Mois suivant" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>→</button></div></div><div className="calendar-grid weekdays">{['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((day) => <span key={day}>{day}</span>)}</div><div className="calendar-grid">{days.map((day, index) => <div className="calendar-day" key={day?.toISOString() || `empty-${index}`}>{day && <><strong>{day.getDate()}</strong>{dayWorkouts(day).map((workout) => <div className={`calendar-event ${workout.status}`} key={workout.id}><button className="calendar-open" onClick={() => onOpen(workout.id)}><b>{workout.status === 'completed' ? 'Consulter' : 'Modifier'}</b><span>{workout.title}</span></button><button className="calendar-delete" aria-label={`Supprimer ${workout.title}`} onClick={() => onDelete(workout.id)}>×</button></div>)}</>}</div>)}</div>{workouts.length === 0 && <Empty title="Votre calendrier est vide" text="Planifiez une séance depuis l’accueil pour commencer." />}</section> }
+function Calendar({ workouts, focusDate, onOpen, onDelete, onValidate }) {
+  const [month, setMonth] = useState(() => {
+    const date = focusDate ? new Date(`${focusDate}T12:00:00`) : new Date()
+    return new Date(date.getFullYear(), date.getMonth(), 1)
+  })
+  const days = useMemo(() => {
+    const start = new Date(month.getFullYear(), month.getMonth(), 1)
+    const end = new Date(month.getFullYear(), month.getMonth() + 1, 0)
+    const offset = (start.getDay() + 6) % 7
+    return [...Array(offset).fill(null), ...Array.from(
+      { length: end.getDate() },
+      (_, index) => new Date(month.getFullYear(), month.getMonth(), index + 1),
+    )]
+  }, [month])
+  const dayWorkouts = (day) => workouts.filter((workout) => workout.scheduledFor === localDateKey(day))
+
+  return (
+    <section>
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">CALENDRIER PERSONNEL</p>
+          <h1>Planifier et retrouver</h1>
+          <p className="muted">Ouvrez une séance pour l’ajuster ou validez-la ici une fois réalisée.</p>
+        </div>
+        <div className="row-actions">
+          <button className="secondary" aria-label="Mois précédent" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>←</button>
+          <strong>{month.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</strong>
+          <button className="secondary" aria-label="Mois suivant" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>→</button>
+        </div>
+      </div>
+      <div className="calendar-grid weekdays">{['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((day) => <span key={day}>{day}</span>)}</div>
+      <div className="calendar-grid">
+        {days.map((day, index) => (
+          <div className="calendar-day" key={day?.toISOString() || `empty-${index}`}>
+            {day && <>
+              <strong>{day.getDate()}</strong>
+              {dayWorkouts(day).map((workout) => (
+                <div className={`calendar-event ${workout.status}`} key={workout.id}>
+                  <button className="calendar-open" onClick={() => onOpen(workout.id)}>
+                    <b>{workout.status === 'completed' ? 'Réalisée' : 'Ouvrir'}</b>
+                    <span>{workout.title}</span>
+                  </button>
+                  <div className="calendar-event-actions">
+                    {workout.status !== 'completed' && <button className="calendar-validate" aria-label={`Valider ${workout.title}`} title="Valider la séance" onClick={() => onValidate(workout.id)}>Valider</button>}
+                    <button className="calendar-delete" aria-label={`Supprimer ${workout.title}`} onClick={() => onDelete(workout.id)}>×</button>
+                  </div>
+                </div>
+              ))}
+            </>}
+          </div>
+        ))}
+      </div>
+      {workouts.length === 0 && <Empty title="Votre calendrier est vide" text="Créez une séance datée depuis l’accueil pour commencer." />}
+    </section>
+  )
+}
 function History({ workouts, onOpen, onDelete }) {
   const archived = workouts
-    .filter((workout) => workout.status === 'completed' || !workout.scheduledFor)
+    .filter((workout) => workout.status === 'completed')
     .sort((a, b) => Date.parse(b.completedAt || b.createdAt || 0) - Date.parse(a.completedAt || a.createdAt || 0))
 
   return (
@@ -120,7 +244,7 @@ function History({ workouts, onOpen, onDelete }) {
         <div>
           <p className="eyebrow">HISTORIQUE</p>
           <h1>Vos séances</h1>
-          <p className="muted">Retrouvez ici les séances sans date et celles déjà réalisées.</p>
+          <p className="muted">Retrouvez ici les séances dont vous avez validé la réalisation.</p>
         </div>
       </div>
       {archived.length ? (
@@ -140,7 +264,7 @@ function History({ workouts, onOpen, onDelete }) {
             )
           })}
         </div>
-      ) : <Empty title="Aucune séance enregistrée" text="Créez une séance sans date ou terminez une séance planifiée pour la retrouver ici." />}
+      ) : <Empty title="Aucune séance enregistrée" text="Validez la réalisation d’une séance depuis le calendrier pour la retrouver ici." />}
     </section>
   )
 }

@@ -1,98 +1,92 @@
-# APEX Performance — Strength Systems
+# APEX — préparation de séances de renforcement
 
-APEX est un assistant de préparation physique qui transforme un objectif et des groupes musculaires en une proposition de séance de renforcement, structurée et entièrement modifiable. Il s’adresse notamment aux étudiants STAPS et aux sportifs qui veulent préparer leur renforcement sans perdre de temps à bâtir seuls chaque séance.
+APEX est une application web de préparation physique. Elle aide un étudiant STAPS, un coach ou un pratiquant avancé à construire une séance de musculation, à l’ajuster, à la planifier et à consigner ce qui a réellement été réalisé. Le programme propose une base de travail ; l’utilisateur garde le contrôle de ses exercices et de ses charges.
 
-APEX ne décide pas à la place de l’utilisateur : il propose une base argumentée, puis laisse la personne choisir les mouvements, les séries, les répétitions, les temps de repos et les charges qu’elle souhaite réaliser.
+## Le besoin et le scénario
 
-## Le besoin en une minute
+Un étudiant STAPS doit préparer une séance de force pour le bas du corps. Il renseigne son prénom et, s’il le souhaite, son poids corporel, choisit un objectif et des groupes musculaires, donne un titre à la séance et choisit une date obligatoire. APEX sélectionne des exercices dans son catalogue et propose une prescription structurée. Il crée la séance : elle apparaît immédiatement dans le calendrier à la date choisie. Depuis cette vue, l’étudiant peut la rouvrir pour l’ajuster, la supprimer ou valider qu’elle a été réalisée ; une séance validée rejoint l’historique.
 
-Un étudiant STAPS prépare une séance de force pour les jambes. Il indique son prénom, renseigne éventuellement sa masse, sélectionne « Force », cible quadriceps et fessiers, donne un titre à la séance et, s’il le souhaite, choisit sa date. APEX propose quatre à six mouvements adaptés à la programmation de force, avec prescriptions, consignes et variantes. L’étudiant remplace un mouvement, réorganise la séance, ajuste séries et charges, puis l’enregistre au calendrier. Pendant la séance, il note ce qu’il a réellement réalisé ; à la fin, il la marque terminée et la retrouve dans son historique.
+En une minute, la démonstration suit donc un parcours complet : **décrire le besoin → générer → ajuster → planifier → valider → retrouver**.
 
-## Principes fonctionnels
+## Fonctionnalités
 
-- Le moteur sélectionne des exercices adaptés à une pratique avancée.
-- Le profil garde le prénom et la masse corporelle facultative ; la masse sert à contextualiser une fourchette de charge indicative sur certains exercices.
-- L’utilisateur choisit un objectif et, s’il le souhaite, les muscles à cibler.
-- La génération propose de quatre à six exercices, sélectionnés dans le catalogue puis ordonnés en priorisant les muscles demandés et en alternant les exercices des séances récentes.
-- Le titre peut être saisi librement (100 caractères maximum) pour identifier plus facilement la séance au calendrier.
-- L’utilisateur garde la main : il peut remplacer, ajouter, supprimer ou réordonner les exercices et modifier les prescriptions et charges.
-- La génération ne marque jamais automatiquement une séance comme terminée.
+- Créer une séance à partir d’un objectif, de muscles ciblés, d’un titre et d’une date obligatoire.
+- Enregistrer un prénom pour personnaliser l’accueil et un poids corporel facultatif pour contextualiser certaines recommandations de charge.
+- Générer au moins quatre exercices, généralement quatre à six ; le moteur en ajoute si nécessaire pour couvrir chaque groupe musculaire sélectionné présent dans le catalogue.
+- Modifier librement la proposition : remplacer, ajouter, supprimer et réordonner les exercices, ainsi qu’ajuster les séries, répétitions, repos et charges.
+- Retrouver les séances planifiées dans le calendrier, les ouvrir ou les supprimer, puis valider leur réalisation depuis cette vue.
+- Consigner les résultats effectués et retrouver les séances terminées dans l’historique.
+- Exporter et importer une sauvegarde JSON depuis les paramètres.
 
-Les charges proposées ne sont pas des prescriptions optimales ni des consignes médicales. La masse seule ne permet pas de connaître la capacité d’une personne : les valeurs sont indicatives et modifiables, et l’utilisateur peut les laisser vides.
+Il n’y a ni sélection de sport principal, ni niveau utilisateur, ni estimation de durée de séance. Les recommandations de charge sont indicatives : le poids corporel ne permet pas, à lui seul, de calculer une charge individuelle optimale.
 
-## Parcours de l’application
+## Parcours de bout en bout
 
-1. **Créer** : le poids est facultatif ; choisir un objectif, des muscles, un titre et éventuellement une date.
-2. **Ajuster** : inspecter l’échauffement, les consignes et les exercices ; remplacer, ajouter, retirer, déplacer ou modifier les prescriptions.
-3. **S’entraîner** : démarrer la séance et noter les résultats réalisés au fil des mouvements.
-4. **Retrouver** : parcourir le calendrier et l’historique, ouvrir ou supprimer une séance.
-5. **Sauvegarder** : exporter ses données en JSON ou réimporter une sauvegarde compatible.
+1. **Créer** — choisir une date obligatoire, un objectif et, éventuellement, des muscles ciblés. Le titre (100 caractères maximum) et le prénom sont facultatifs ; un titre est proposé automatiquement s’il reste vide. Le poids est facultatif.
+2. **Planifier** — cliquer sur **Créer et planifier ma séance**. La séance est enregistrée et le calendrier s’ouvre sur le mois de la date choisie.
+3. **Ajuster** — ouvrir la séance depuis le calendrier pour examiner les mouvements, les consignes et les suggestions, puis personnaliser le contenu.
+4. **Réaliser** — enregistrer les résultats dans la séance, ou utiliser **Valider** dans le calendrier pour confirmer directement sa réalisation.
+5. **Retrouver** — consulter les séances à venir dans le calendrier et les séances terminées dans l’historique. Une sauvegarde JSON permet de transférer les données manuellement.
 
-## Architecture
+## Règle de génération
+
+Le moteur métier partagé se trouve dans [`frontend/src/engine/workoutEngine.js`](./frontend/src/engine/workoutEngine.js) et est appelé côté serveur par [`backend/planner.js`](./backend/planner.js).
+
+1. Il vérifie et normalise les entrées, notamment le titre et la date.
+2. Il filtre les mouvements selon l’objectif choisi et le catalogue d’exercices.
+3. Il priorise les muscles demandés et tient compte des séances récentes pour limiter les répétitions lorsque le catalogue le permet.
+4. Il applique les prescriptions prévues pour l’objectif : séries, répétitions et temps de repos.
+5. Il retourne une séance modifiable, avec des consignes, des variantes et, pour certains mouvements, une fourchette de charge indicative fondée sur le poids fourni.
+
+La sélection est déterministe : mêmes entrées et même historique donnent le même résultat. Si aucun muscle n’est sélectionné, le moteur construit une séance générale compatible avec l’objectif. Une entrée invalide, dont une date absente, doit être corrigée avant la création.
+
+## Architecture et données
 
 ```text
-frontend/src/
-  App.jsx                    navigation, formulaires et vues React
-  App.css, local.css         système visuel responsive
-  assets/                    identité APEX et image d’ambiance SVG locale
-  data/                      catalogue d’exercices et objectifs
-  engine/                    sélection, variation et prescriptions
-  storage/                   IndexedDB et import/export JSON
-backend/
-  server.js                  API Express, auth API et livraison du frontend
-  planner.js                 adaptateur vers le moteur métier commun
-database/init.sql            schéma et données de démonstration PostgreSQL
-Dockerfile                   build Vite et image de service Node.js
-docker-compose.yml           environnement application + PostgreSQL
+frontend/                     Interface React, construite avec Vite
+  src/App.jsx                 navigation, formulaire et vues
+  src/engine/                 règles de génération et tests du moteur
+  src/storage/                stockage navigateur, sauvegarde et import/export
+  src/assets/                 identité visuelle et illustration locale
+backend/                      Serveur Node.js / Express et endpoints API
+  planner.js                  adaptateur vers le moteur métier
+  server.js                   API, authentification de démonstration et service web
+database/init.sql             schéma PostgreSQL et exercices de démonstration
+Dockerfile                    construction multi-étape de l’application
+docker-compose.yml             services de l’application et de PostgreSQL
 ```
 
-React et Vite assurent l’interface. Node.js et Express servent l’application et exposent une API de démonstration. Le moteur utilisé par l’interface est déterministe et local : aucune IA ou API externe n’est nécessaire. PostgreSQL est préparé pour le jalon de modélisation et l’évolution API ; l’application principale n’impose pas de compte et garde ses données dans le navigateur.
+### Où les données sont-elles enregistrées ?
 
-### Règle de génération
+Le parcours principal, sans compte utilisateur, enregistre le profil et les séances localement dans **IndexedDB**, dans le navigateur. Ces données ne sont donc pas synchronisées entre appareils et ne sont pas automatiquement envoyées à PostgreSQL. Il faut exporter une sauvegarde JSON pour les transférer. Lors du chargement d’anciennes données locales, une séance qui n’avait pas de date reçoit sa date de création afin de rester accessible dans le calendrier.
 
-La règle unique se trouve dans [`frontend/src/engine/workoutEngine.js`](./frontend/src/engine/workoutEngine.js) et est réutilisée côté Node par [`backend/planner.js`](./backend/planner.js) :
+Le projet fournit aussi un backend Express et un schéma PostgreSQL pour démontrer et faire évoluer la couche API. Docker démarre PostgreSQL et le serveur Node.js. Le frontend de démonstration actuel utilise toutefois son stockage local ; le branchement complet du parcours React sur une API authentifiée et la synchronisation multi-appareils constituent une évolution future, et non une capacité à supposer déjà présente.
 
-1. filtrer les exercices compatibles avec l’objectif ;
-2. prioriser ceux qui sollicitent les groupes musculaires choisis ;
-3. tenir compte des trois séances récentes pour réduire les répétitions si le catalogue le permet ;
-4. appliquer les séries, répétitions et repos configurés pour l’objectif ;
-5. renvoyer quatre à six mouvements avec leurs consignes, variantes et précautions.
+### Modèle relationnel PostgreSQL
 
-Le catalogue distingue les exercices accessibles à une pratique avancée. La sélection et les remplacements respectent cette règle.
+- `users.id` est la clé primaire d’un compte.
+- `profiles.user_id` est à la fois clé primaire et clé étrangère vers `users.id` : un profil au plus par compte. `body_mass` est en kilogrammes.
+- `workouts.id` est la clé primaire d’une séance ; `user_id` référence son propriétaire. `scheduled_for` est une date obligatoire, et `status` décrit l’état de la séance.
+- `exercises.id` est la clé primaire du catalogue.
+- `workout_exercises` relie séances et exercices ; sa clé primaire composée (`workout_id`, `order_index`) conserve la position d’un mouvement dans une séance. Les charges sont en kilogrammes, les repos en secondes et les répétitions sont du texte pour autoriser des formats comme `8–12`.
 
-## Modèle de données
-
-Le stockage courant est IndexedDB, dans un document versionné :
-
-| Donnée | Type / exemple | Rôle |
-|---|---|---|
-| `profile.firstName` | texte, 40 caractères maximum | Accueil personnalisé |
-| `profile.bodyMass` | nombre en kg ou vide | Contexte facultatif des recommandations de charge |
-| `workouts[].id` | UUID | Identifiant stable de séance |
-| `workouts[].title` | texte, 100 caractères maximum | Repérage dans le calendrier et l’historique |
-| `workouts[].objective` | identifiant d’objectif | Règle de prescription appliquée |
-| `workouts[].bodyMass` | nombre en kg ou `null` | Masse utilisée pour les recommandations de cette séance |
-| `workouts[].muscles` | tableau de libellés | Groupes musculaires ciblés |
-| `workouts[].scheduledFor` | date `YYYY-MM-DD` ou `null` | Planification calendrier |
-| `workouts[].status` | `generated`, `planned`, `started`, `completed` | État du parcours |
-| `workouts[].exercises[]` | identifiant, séries, répétitions, repos, charge, résultats | Proposition et travail réellement effectué |
-
-Dans PostgreSQL, `users.id` est la clé primaire des utilisateurs. `profiles.user_id` référence `users.id` et `profiles.first_name` conserve le prénom. `workouts.id` est la clé primaire des séances et `workout_exercises` relie une séance à ses exercices avec une position (`order_index`). Les repos sont stockés en secondes, les masses et charges en kilogrammes, et les répétitions en texte pour permettre des formats comme `8–12` ou `30 s`.
-
-Exemple de lecture des séances d’un utilisateur :
+Exemple : retrouver les séances prévues d’un utilisateur, de la plus proche à la plus éloignée.
 
 ```sql
-SELECT w.id, w.title, w.objective, w.status, w.scheduled_for
-FROM workouts AS w
-WHERE w.user_id = $1
-ORDER BY COALESCE(w.scheduled_for, w.created_at) DESC;
+SELECT id, title, objective, status, scheduled_for
+FROM workouts
+WHERE user_id = $1
+  AND scheduled_for >= CURRENT_DATE
+ORDER BY scheduled_for, id;
 ```
 
-`$1` est l’identifiant utilisateur passé comme paramètre SQL, et non concaténé dans la requête. Le schéma complet et les exercices de démonstration sont dans [`database/init.sql`](./database/init.sql).
+`$1` est un paramètre lié par le pilote PostgreSQL ; il ne faut pas concaténer une entrée utilisateur à la requête. Le schéma complet et les exercices d’exemple figurent dans [`database/init.sql`](./database/init.sql). Lors de l’initialisation d’une base existante, les anciennes séances sans date reçoivent leur date de création avant que la colonne ne devienne obligatoire.
 
-## Lancer le projet
+## Installer et lancer
 
-Prérequis : Node.js 24 ou plus récent et npm.
+Prérequis : **Node.js 24 ou plus récent**, npm et, pour le déploiement complet conteneurisé, Docker avec Docker Compose.
+
+### Lancement local du frontend et de l’API
 
 ```bash
 npm install
@@ -100,59 +94,58 @@ npm --prefix frontend install
 npm run dev
 ```
 
-Le serveur Express démarre sur `http://localhost:3000`. Il sert l’application compilée ; pour développer l’interface Vite directement :
+Le serveur Express démarre sur `http://localhost:3000`. Pour lancer directement le serveur de développement Vite dans un autre terminal :
 
 ```bash
 npm run dev:frontend
 ```
 
-Pour PostgreSQL, copier `.env.example` vers `.env`, compléter les valeurs locales, puis lancer :
+### Lancement avec Docker et PostgreSQL
 
 ```bash
+cp .env.example .env
 docker compose up --build
 ```
 
-Ne jamais publier le fichier `.env` ni ses secrets.
+Ouvrir ensuite `http://localhost:3000`. Les paramètres de `.env.example` sont destinés au développement local : choisir des secrets dédiés et une configuration sécurisée avant toute exposition publique. Le script SQL initialise le volume PostgreSQL lors de sa première création ; une base déjà initialisée n’exécute pas automatiquement de nouveau les scripts du dossier d’initialisation.
 
-## Sauvegarde et confidentialité
+## Tests et essais reproductibles
 
-Les séances et le profil facultatif sont enregistrés automatiquement dans IndexedDB, sur l’appareil. Ils ne sont pas envoyés au serveur par le parcours principal. Les sauvegardes JSON comprennent un format et une version ; les anciennes versions prises en charge sont migrées au chargement. Les fichiers mal formés, versions inconnues ou valeurs de masse hors limites sont refusés avec un message explicite. L’import demande confirmation avant de remplacer des données déjà présentes.
-
-Un effacement du stockage du navigateur ou un changement d’appareil peut entraîner une perte des données locales : exporter régulièrement une sauvegarde.
-
-## Vérifications et démonstration
-
-Commandes de contrôle :
+Depuis la racine du projet :
 
 ```bash
 npm test
 npm run lint
 npm run build
-docker build --build-arg BASE_PATH=/projet-ihme-p18/ -t apex .
+node --check backend/server.js
 ```
 
-Les tests automatisés portent notamment sur la sélection et la variété, le nombre d’exercices, les prescriptions, la validation du titre et de la masse, les statuts et l’import de sauvegardes.
+Les tests automatisés couvrent notamment les prescriptions, le nombre d’exercices, la validation des entrées, la date obligatoire, les statuts, le catalogue et les sauvegardes.
 
-| Essai manuel | Entrée | Résultat attendu |
-|---|---|---|
-| Parcours normal | Prénom, masse 72 kg, force, quadriceps/fessiers, titre « Force bas du corps », date choisie | 4 à 6 mouvements pertinents, recommandations indicatives en kg, titre visible dans le calendrier, séance modifiable |
-| Cas vide | Aucun muscle sélectionné, aucun poids saisi | Une séance générale pour l’objectif choisi est quand même proposée ; aucune fourchette basée sur la masse |
-| Limite / erreur | Masse hors 20–300 kg, titre de plus de 100 caractères ou date impossible | La saisie est refusée ou une erreur compréhensible est affichée, sans séance incohérente |
+| Essai | Entrée | Résultat attendu | Résultat vérifié |
+|---|---|---|---|
+| Parcours normal | Prénom « Paul », poids 72 kg, objectif Force, quadriceps et fessiers, titre « Force bas du corps », date choisie | La séance est créée, modifiable et visible immédiatement dans le bon mois du calendrier. | Vérifié dans le navigateur : affichage immédiat sur le mois choisi, puis validation et présence dans l’historique. |
+| Entrée vide | Ne choisir aucun muscle et ne pas renseigner le poids, tout en complétant le titre, la date et l’objectif | Une séance générale est proposée ; aucune recommandation fondée sur le poids n’est affichée. | Vérifié par le test automatisé `empty muscle selection still produces a general session`. |
+| Valeur invalide / limite | Omettre la date, ou saisir un poids en dehors de la plage acceptée, ou un titre trop long | La création est bloquée avec un message explicite ; aucune séance incohérente n’est ajoutée. | Vérifié : date vide bloquée par le formulaire ; moteur testé aux bornes de 20 et 300 kg et contre les valeurs invalides ainsi qu’un titre de plus de 100 caractères. |
+| Validation | Depuis le calendrier, ouvrir une séance non terminée puis choisir **Valider** | Après confirmation, son statut devient terminée et elle apparaît dans l’historique. | Vérifié dans le navigateur avec confirmation ; le statut terminé est affiché dans l’historique. |
+
+Pour rejouer le parcours complet, vérifier l’apparition dans le calendrier avant de valider la séance, puis vérifier sa présence dans l’historique. Une date future permet aussi de vérifier que le calendrier s’ouvre directement sur le mois planifié.
 
 ## Jalons pédagogiques
 
-1. **Cadrage** : l’utilisateur STAPS prépare une séance structurée, la modifie et consigne ses résultats ; le scénario ci-dessus se démontre rapidement.
-2. **Modèle de données** : tables, clés, relations, types et unités sont documentés ; la requête `SELECT` montre la consultation des séances d’un utilisateur.
-3. **API et règle métier** : le moteur local filtre, priorise et prescrit ; les tests couvrent les critères normaux et les valeurs invalides.
-4. **Interface React** : saisie de l’objectif, du titre, des muscles et de la date ; affichage des prescriptions, des erreurs et des confirmations.
-5. **Intégration et tests** : génération → édition → calendrier → entraînement → historique, plus les essais normal, vide et limite.
-6. **Déploiement et documentation** : Dockerfile, Compose et instructions reproductibles sont fournis ; expliquer que la génération reste locale et que le stockage navigateur n’est pas synchronisé.
+1. **Cadrage du besoin** — utilisateur : étudiant STAPS ou pratiquant avancé ; problème : structurer une séance ajustable ; résultat : proposition planifiée et traçable.
+2. **Modèle de données** — expliquer les clés primaires et étrangères, l’ordre des exercices, les unités, puis présenter la requête `SELECT` ci-dessus.
+3. **API et règles métier** — suivre un objectif et des muscles jusqu’au filtrage et à la prescription ; expliquer un cas normal, aucun muscle choisi et une date absente.
+4. **Interface React** — montrer les entrées, les contrôles, les erreurs, les changements d’exercices et le retour immédiat au calendrier.
+5. **Intégration et tests** — démontrer génération → édition → calendrier → validation → historique ; rejouer les essais normal, vide et invalide.
+6. **Déploiement et documentation** — démarrer l’application avec Docker, expliquer la limite du stockage local et présenter une amélioration future.
 
-Pour une présentation de deux minutes : montrer le formulaire, expliquer comment `selectExercises` trie les mouvements selon l’objectif et les muscles, suivre le tableau `workout` jusqu’à IndexedDB, puis préciser comme limite que les recommandations de charge restent indicatives et ne remplacent pas une évaluation individuelle.
+Pour commenter le trajet des données : le formulaire React passe les entrées à `generateWorkout`, le moteur commun sélectionne et prescrit les mouvements, puis l’application ajoute l’objet de séance au stockage IndexedDB. La navigation ouvre ensuite le calendrier à partir de la date choisie. La validation change son statut et l’historique filtre les séances terminées.
 
-## Limites connues
+## Limites et améliorations possibles
 
-- La qualité des séances dépend du catalogue et de règles déterministes ; l’outil ne remplace pas l’expertise d’un préparateur physique.
-- Le poids corporel ne suffit pas à déduire une charge optimale : l’utilisateur doit calibrer et modifier toute proposition.
-- Les données du parcours principal sont locales et ne se synchronisent pas entre appareils.
-- L’API PostgreSQL constitue le support technique du jalon ; le parcours de démonstration reste sans compte et repose sur IndexedDB.
+- La qualité dépend du catalogue et de règles déterministes ; APEX ne remplace ni un préparateur physique ni une évaluation médicale.
+- Le poids seul ne permet pas de déduire une charge sûre ou optimale ; toutes les suggestions doivent être ajustées par l’utilisateur.
+- Les données du parcours principal sont locales et peuvent être perdues si le stockage du navigateur est effacé.
+- Le frontend n’est pas encore synchronisé avec le backend PostgreSQL ; une authentification, une synchronisation inter-appareils et des sauvegardes automatiques seraient les prochaines améliorations structurantes.
+- Une évolution premium pourrait ajouter des confirmations de progression, des indicateurs de volume par groupe musculaire, une recherche dans l’historique et une meilleure accessibilité clavier, sans automatiser les décisions d’entraînement.
