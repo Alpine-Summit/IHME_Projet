@@ -1,1 +1,11 @@
 /* Styles locaux conservés pour les extensions futures. */
+
+.variation-note {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: #e8f0ec;
+  color: #426b55;
+  font-size: 11px;
+  line-height: 1.5;
+}

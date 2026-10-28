@@ -8,18 +8,23 @@ function warmupFor(sport, objective) {
   return { minutes: objective === 'pliometrie' || objective === 'puissance' ? 10 : 8, description: `${sportText}, puis deux répétitions faciles du premier mouvement.` }
 }
 
-export function selectExercises({ sport, objective, level, muscles = [] }) {
+export function selectExercises({ sport, objective, level, muscles = [], recentWorkouts = [] }) {
   const targetGroups = new Set(muscles)
   const rank = levelRank[level] ?? 0
-  return EXERCISES
+  const recentExercises = recentWorkouts.slice(0, 3).flatMap((workout) => workout.exercises || [])
+  const recentCounts = new Map()
+  recentExercises.forEach((exercise) => recentCounts.set(exercise.exerciseId, (recentCounts.get(exercise.exerciseId) || 0) + 1))
+  const candidates = EXERCISES
     .filter((exercise) => exercise.objectives.includes(objective))
     .filter((exercise) => exercise.sports.includes(sport) || exercise.sports.includes('Autre'))
     .filter((exercise) => exercise.levels.some((item) => levelRank[item] <= rank))
     .filter((exercise) => targetGroups.size === 0 || exercise.muscles.some((muscle) => targetGroups.has(muscle)))
-    .sort((a, b) => {
+  return candidates.sort((a, b) => {
       const aGroup = targetGroups.size > 0 && a.muscles.some((muscle) => targetGroups.has(muscle)) ? 1 : 0
       const bGroup = targetGroups.size > 0 && b.muscles.some((muscle) => targetGroups.has(muscle)) ? 1 : 0
-      return bGroup - aGroup
+      const aRecent = recentCounts.get(a.id) || 0
+      const bRecent = recentCounts.get(b.id) || 0
+      return (bGroup - aGroup) || (aRecent - bRecent)
     })
 }
 
@@ -75,12 +80,12 @@ export function prescribeExercise(exercise, objective, level, bodyMass) {
   }
 }
 
-export function generateWorkout(profile, { objective = 'general', duration = 45, scheduledFor = null } = {}) {
+export function generateWorkout(profile, { objective = 'general', duration = 45, scheduledFor = null, recentWorkouts = [] } = {}) {
   const numericDuration = Number(duration)
   if (!Number.isFinite(numericDuration) || numericDuration < 30 || numericDuration > 60) throw new Error('La durée doit être comprise entre 30 et 60 minutes.')
   if (!profile?.sport || !profile?.level) throw new Error('Renseignez votre sport et votre niveau avant de générer une séance.')
   const config = objectiveConfig(objective)
-  const selected = selectExercises({ ...profile, objective }).slice(0, Math.max(2, Math.min(6, Math.floor((numericDuration - 10) / 7))))
+  const selected = selectExercises({ ...profile, objective, recentWorkouts }).slice(0, Math.max(2, Math.min(6, Math.floor((numericDuration - 10) / 7))))
   if (!selected.length) throw new Error('Aucun exercice compatible avec vos critères. Essayez un autre objectif ou un autre groupe musculaire.')
   const workout = {
     id: crypto.randomUUID(),
@@ -88,6 +93,7 @@ export function generateWorkout(profile, { objective = 'general', duration = 45,
     sport: profile.sport || 'Renforcement général',
     bodyMass: Number(profile.bodyMass) || null,
     objective,
+    variationNote: recentWorkouts.length ? 'Sélection alternée avec vos séances récentes pour limiter les répétitions.' : 'Première séance de cette préparation : les prochaines propositions varieront selon votre historique.',
     targetDuration: numericDuration,
     scheduledFor: scheduledFor || null,
     status: scheduledFor ? 'planned' : 'generated',

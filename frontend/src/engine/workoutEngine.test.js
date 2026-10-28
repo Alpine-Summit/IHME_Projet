@@ -23,6 +23,12 @@ test('selected muscles constrain the generated exercise list', () => {
   assert.ok(selected.every((exercise) => exercise.muscles.includes('Pectoraux')))
 })
 
+test('recent exercises are deprioritized for deterministic session variety', () => {
+  const first = generateWorkout(profile, { objective: 'force', duration: 45 })
+  const second = generateWorkout(profile, { objective: 'force', duration: 45, recentWorkouts: [first] })
+  assert.notEqual(second.exercises[0].exerciseId, first.exercises[0].exerciseId)
+})
+
 test('plyometric prescription remains controlled for beginners', () => {
   const workout = generateWorkout(profile, { objective: 'pliometrie', duration: 30 })
   assert.equal(workout.status, 'generated')
