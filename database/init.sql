@@ -39,9 +39,12 @@ CREATE TABLE IF NOT EXISTS workouts (
   id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title VARCHAR(160) NOT NULL, objective VARCHAR(30) NOT NULL,
   duration_minutes INTEGER NOT NULL CHECK (duration_minutes BETWEEN 30 AND 60), scheduled_for DATE,
-  status VARCHAR(20) NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'completed')),
+  status VARCHAR(20) NOT NULL DEFAULT 'generated' CHECK (status IN ('generated', 'planned', 'started', 'completed')),
   completed_at TIMESTAMPTZ, notes TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS workouts_user_scheduled_idx ON workouts(user_id, scheduled_for);
+CREATE INDEX IF NOT EXISTS workouts_user_status_idx ON workouts(user_id, status);
 
 CREATE TABLE IF NOT EXISTS workout_exercises (
   workout_id INTEGER NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,

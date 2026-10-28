@@ -15,6 +15,7 @@ export function selectExercises({ sport, objective, level, muscles = [] }) {
     .filter((exercise) => exercise.objectives.includes(objective))
     .filter((exercise) => exercise.sports.includes(sport) || exercise.sports.includes('Autre'))
     .filter((exercise) => exercise.levels.some((item) => levelRank[item] <= rank))
+    .filter((exercise) => targetGroups.size === 0 || exercise.muscles.some((muscle) => targetGroups.has(muscle)))
     .sort((a, b) => {
       const aGroup = targetGroups.size > 0 && a.muscles.some((muscle) => targetGroups.has(muscle)) ? 1 : 0
       const bGroup = targetGroups.size > 0 && b.muscles.some((muscle) => targetGroups.has(muscle)) ? 1 : 0
@@ -75,16 +76,19 @@ export function prescribeExercise(exercise, objective, level, bodyMass) {
 }
 
 export function generateWorkout(profile, { objective = 'general', duration = 45, scheduledFor = null } = {}) {
+  const numericDuration = Number(duration)
+  if (!Number.isFinite(numericDuration) || numericDuration < 30 || numericDuration > 60) throw new Error('La durée doit être comprise entre 30 et 60 minutes.')
+  if (!profile?.sport || !profile?.level) throw new Error('Renseignez votre sport et votre niveau avant de générer une séance.')
   const config = objectiveConfig(objective)
-  const selected = selectExercises({ ...profile, objective }).slice(0, Math.max(2, Math.min(6, Math.floor((Number(duration) - 10) / 7))))
-  if (!selected.length) throw new Error('Aucun exercice compatible avec le matériel et le profil sélectionnés.')
+  const selected = selectExercises({ ...profile, objective }).slice(0, Math.max(2, Math.min(6, Math.floor((numericDuration - 10) / 7))))
+  if (!selected.length) throw new Error('Aucun exercice compatible avec vos critères. Essayez un autre objectif ou un autre groupe musculaire.')
   const workout = {
     id: crypto.randomUUID(),
-    title: `${config.label} — ${duration} min`,
+    title: `${config.label} — ${numericDuration} min`,
     sport: profile.sport || 'Renforcement général',
     bodyMass: Number(profile.bodyMass) || null,
     objective,
-    targetDuration: Number(duration),
+    targetDuration: numericDuration,
     scheduledFor: scheduledFor || null,
     status: scheduledFor ? 'planned' : 'generated',
     createdAt: new Date().toISOString(),

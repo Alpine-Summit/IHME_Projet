@@ -2,12 +2,18 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { estimateWorkoutMinutes, generateWorkout, selectExercises } from './workoutEngine.js'
 
-const profile = { sport: 'Course à pied', level: 'debutant', muscles: ['Jambes', 'Tronc'], equipment: ['Poids du corps'] }
+const profile = { sport: 'Course à pied', level: 'debutant', muscles: ['Quadriceps', 'Abdominaux'], equipment: ['Poids du corps'] }
 
 test('selection respects objective, level and muscle priorities', () => {
   const selected = selectExercises({ ...profile, objective: 'force' })
   assert.ok(selected.length > 0)
   assert.ok(selected.every((exercise) => exercise.objectives.includes('force')))
+})
+
+test('selected muscles constrain the generated exercise list', () => {
+  const selected = selectExercises({ ...profile, objective: 'force', muscles: ['Pectoraux'] })
+  assert.ok(selected.length > 0)
+  assert.ok(selected.every((exercise) => exercise.muscles.includes('Pectoraux')))
 })
 
 test('plyometric prescription remains controlled for beginners', () => {
@@ -29,4 +35,17 @@ test('body mass gives only a conservative editable load range', () => {
   assert.ok(loadedExercise)
   assert.ok(loadedExercise.loadSuggestion.minKg < loadedExercise.loadSuggestion.maxKg)
   assert.equal(generateWorkout(profile, { objective: 'force', duration: 45 }).exercises.some((exercise) => exercise.loadSuggestion), false)
+})
+
+test('scheduled sessions are planned and duration boundaries are controlled', () => {
+  const workout = generateWorkout(profile, { objective: 'general', duration: 60, scheduledFor: '2026-11-01' })
+  assert.equal(workout.status, 'planned')
+  assert.equal(workout.targetDuration, 60)
+  assert.throws(() => generateWorkout(profile, { duration: 29 }), /30 et 60/)
+  assert.throws(() => generateWorkout(profile, { duration: 61 }), /30 et 60/)
+})
+
+test('empty muscle selection still produces a general session', () => {
+  const workout = generateWorkout({ ...profile, muscles: [] }, { objective: 'general', duration: 30 })
+  assert.ok(workout.exercises.length >= 2)
 })
