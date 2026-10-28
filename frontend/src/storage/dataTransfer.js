@@ -1,7 +1,7 @@
-export const DATA_VERSION = 1
+export const DATA_VERSION = 2
 
 function isValidProfile(profile) {
-  return profile && typeof profile === 'object' && typeof profile.displayName === 'string' && typeof profile.sport === 'string' && typeof profile.level === 'string'
+  return profile && typeof profile === 'object' && typeof profile.displayName === 'string' && ['debutant', 'intermediaire', 'avance'].includes(profile.level)
 }
 
 function isValidWorkout(workout) {
@@ -9,7 +9,7 @@ function isValidWorkout(workout) {
 }
 
 export function exportData(data) {
-  const payload = { format: 'move-training-data', version: DATA_VERSION, exportedAt: new Date().toISOString(), data }
+  const payload = { format: 'apex-training-data', version: DATA_VERSION, exportedAt: new Date().toISOString(), data }
   const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
   const link = document.createElement('a')
   link.href = url
@@ -19,7 +19,8 @@ export function exportData(data) {
 }
 
 export function parseImport(text) {
-  const payload = JSON.parse(text)
-  if (payload?.format !== 'move-training-data' || payload.version !== DATA_VERSION || !isValidProfile(payload.data?.profile) || !Array.isArray(payload.data.workouts) || !payload.data.workouts.every(isValidWorkout)) throw new Error('Ce fichier n’est pas une sauvegarde APEX valide ou sa version est incompatible.')
+  let payload
+  try { payload = JSON.parse(text) } catch { throw new Error('Le fichier sélectionné n’est pas un JSON valide.') }
+  if (payload?.format !== 'apex-training-data' || payload.version !== DATA_VERSION || !isValidProfile(payload.data?.profile) || !Array.isArray(payload.data.workouts) || !payload.data.workouts.every(isValidWorkout)) throw new Error('Ce fichier n’est pas une sauvegarde APEX valide ou sa version est incompatible.')
   return payload.data
 }

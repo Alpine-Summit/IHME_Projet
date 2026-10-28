@@ -9,3 +9,36 @@
   font-size: 11px;
   line-height: 1.5;
 }
+
+.brand-button { padding: 0; text-align: left; }
+.replace-row { display: flex; gap: 8px; margin-top: 18px; }
+.replace-row select { flex: 1; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: #fff; }
+.replace-row button:disabled { cursor: not-allowed; opacity: .5; }
+
+/* Desktop refinement: a restrained editorial grid keeps every surface aligned. */
+@media (min-width: 821px) {
+  .app { max-width: 1440px; padding: 30px 56px 64px; }
+  .topbar { max-width: 1180px; margin: 0 auto 48px; min-height: 42px; }
+  .welcome { max-width: 1180px; min-height: 340px; margin: 0 auto 30px; padding: 64px 66px; }
+  .welcome h1 { max-width: 760px; font-size: clamp(48px, 5vw, 72px); }
+  .profile, .dashboard-grid { width: min(100%, 980px); margin-left: auto; margin-right: auto; }
+  .profile { margin-bottom: 30px; }
+  .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
+  .generator { width: 100%; max-width: none; padding: 38px 42px 34px; }
+  .generator-heading { align-items: flex-start; }
+  .generator h2 { font-size: 36px; }
+  .workout-view { max-width: 1180px; margin: 0 auto; }
+  .workout-layout { max-width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 20px; }
+  .workout-layout > .panel:first-child { grid-column: 1 / -1; }
+  .exercise-card { min-height: 372px; display: flex; flex-direction: column; }
+  .exercise-card details { margin-top: auto; }
+  .calendar-grid { max-width: 1180px; margin-left: auto; margin-right: auto; }
+  .calendar-day { min-height: 142px; padding: 13px; }
+  .calendar-event > button:first-child { min-height: 46px; }
+  .history-list, .settings { width: min(100%, 980px); max-width: none; margin: 0 auto; }
+}
+
+@media (max-width: 480px) {
+  .replace-row { align-items: stretch; flex-direction: column; }
+  .replace-row button { width: 100%; }
+}

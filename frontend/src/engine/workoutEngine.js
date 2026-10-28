@@ -1,42 +1,32 @@
 import { EXERCISES, OBJECTIVES } from '../data/exercises.js'
 
-const objectiveConfig = (id) => OBJECTIVES.find((objective) => objective.id === id) || OBJECTIVES.at(-1)
 const levelRank = { debutant: 0, intermediaire: 1, avance: 2 }
+const objectiveConfig = (id) => OBJECTIVES.find((objective) => objective.id === id) || OBJECTIVES.at(-1)
 
-function warmupFor(sport, objective) {
-  const sportText = sport === 'Cyclisme' ? 'mobilité des hanches et activation des jambes' : sport === 'Course à pied' ? 'mise en route progressive, mobilité des chevilles et activation des hanches' : 'mise en route progressive, mobilité et activation générale'
-  return { minutes: objective === 'pliometrie' || objective === 'puissance' ? 10 : 8, description: `${sportText}, puis deux répétitions faciles du premier mouvement.` }
+function warmupFor(objective) {
+  const description = objective === 'pliometrie' || objective === 'puissance'
+    ? 'Activation progressive des articulations, éducatifs de réception et répétitions techniques à faible intensité.'
+    : 'Mise en route progressive, mobilité des zones ciblées et répétitions techniques du premier mouvement.'
+  return { description }
 }
 
-export function selectExercises({ sport, objective, level, muscles = [], recentWorkouts = [] }) {
+export function selectExercises({ objective, level, muscles = [], recentWorkouts = [] }) {
   const targetGroups = new Set(muscles)
   const rank = levelRank[level] ?? 0
-  const recentExercises = recentWorkouts.slice(0, 3).flatMap((workout) => workout.exercises || [])
   const recentCounts = new Map()
-  recentExercises.forEach((exercise) => recentCounts.set(exercise.exerciseId, (recentCounts.get(exercise.exerciseId) || 0) + 1))
-  const candidates = EXERCISES
+  recentWorkouts.slice(0, 3).flatMap((workout) => workout.exercises || []).forEach((exercise) => {
+    recentCounts.set(exercise.exerciseId, (recentCounts.get(exercise.exerciseId) || 0) + 1)
+  })
+  return EXERCISES
     .filter((exercise) => exercise.objectives.includes(objective))
-    .filter((exercise) => exercise.sports.includes(sport) || exercise.sports.includes('Autre'))
     .filter((exercise) => exercise.levels.some((item) => levelRank[item] <= rank))
-    .filter((exercise) => targetGroups.size === 0 || exercise.muscles.some((muscle) => targetGroups.has(muscle)))
-  return candidates.sort((a, b) => {
-      const aGroup = targetGroups.size > 0 && a.muscles.some((muscle) => targetGroups.has(muscle)) ? 1 : 0
-      const bGroup = targetGroups.size > 0 && b.muscles.some((muscle) => targetGroups.has(muscle)) ? 1 : 0
+    .sort((a, b) => {
+      const aTarget = targetGroups.size > 0 && a.muscles.some((muscle) => targetGroups.has(muscle)) ? 1 : 0
+      const bTarget = targetGroups.size > 0 && b.muscles.some((muscle) => targetGroups.has(muscle)) ? 1 : 0
       const aRecent = recentCounts.get(a.id) || 0
       const bRecent = recentCounts.get(b.id) || 0
-      return (bGroup - aGroup) || (aRecent - bRecent)
+      return (bTarget - aTarget) || (aRecent - bRecent)
     })
-}
-
-export function estimateExerciseMinutes(item) {
-  const sets = Number(item.sets) || 0
-  const reps = Number.parseInt(String(item.reps), 10) || 8
-  const workSeconds = item.durationSeconds || Math.max(25, reps * 4)
-  return Math.ceil((sets * workSeconds + Math.max(0, sets - 1) * (Number(item.restSeconds) || 60) + 30) / 60)
-}
-
-export function estimateWorkoutMinutes(workout) {
-  return (workout.warmup?.minutes || 0) + (workout.exercises || []).reduce((total, exercise) => total + estimateExerciseMinutes(exercise), 0)
 }
 
 function roundLoad(value) { return Math.max(0.5, Math.round(value * 2) / 2) }
@@ -44,11 +34,7 @@ function roundLoad(value) { return Math.max(0.5, Math.round(value * 2) / 2) }
 export function suggestExternalLoad(exercise, bodyMass, level, objective) {
   const mass = Number(bodyMass)
   if (!Number.isFinite(mass) || mass <= 0 || exercise.equipment.every((item) => item === 'Poids du corps') || exercise.equipment.includes('Machines')) return null
-  const levelRanges = {
-    debutant: [0.25, 0.4],
-    intermediaire: [0.4, 0.6],
-    avance: [0.55, 0.8],
-  }
+  const levelRanges = { debutant: [0.25, 0.4], intermediaire: [0.4, 0.6], avance: [0.55, 0.8] }
   const [low, high] = levelRanges[level] || levelRanges.debutant
   let factors = exercise.group === 'Haut du corps' ? [low * 0.35, high * 0.35] : exercise.group === 'Tronc' ? [low * 0.2, high * 0.3] : [low, high]
   if (objective === 'puissance' || objective === 'pliometrie') factors = [factors[0] * 0.5, factors[1] * 0.5]
@@ -80,33 +66,33 @@ export function prescribeExercise(exercise, objective, level, bodyMass) {
   }
 }
 
-export function generateWorkout(profile, { objective = 'general', duration = 45, scheduledFor = null, recentWorkouts = [] } = {}) {
-  const numericDuration = Number(duration)
-  if (!Number.isFinite(numericDuration) || numericDuration < 30 || numericDuration > 60) throw new Error('La durée doit être comprise entre 30 et 60 minutes.')
-  if (!profile?.sport || !profile?.level) throw new Error('Renseignez votre sport et votre niveau avant de générer une séance.')
+export function generateWorkout(profile, { objective = 'general', scheduledFor = null, recentWorkouts = [] } = {}) {
+  if (!profile?.level || !Object.hasOwn(levelRank, profile.level)) throw new Error('Sélectionnez votre niveau avant de générer une séance.')
+  if (!OBJECTIVES.some((item) => item.id === objective)) throw new Error('Sélectionnez un objectif valide.')
   const config = objectiveConfig(objective)
-  const selected = selectExercises({ ...profile, objective, recentWorkouts }).slice(0, Math.max(2, Math.min(6, Math.floor((numericDuration - 10) / 7))))
-  if (!selected.length) throw new Error('Aucun exercice compatible avec vos critères. Essayez un autre objectif ou un autre groupe musculaire.')
-  const workout = {
+  const candidates = selectExercises({ ...profile, objective, recentWorkouts })
+  if (!candidates.length) throw new Error('Aucun exercice compatible avec vos critères. Essayez un autre objectif ou un autre groupe musculaire.')
+  const targetGroups = new Set(profile.muscles || [])
+  const targeted = targetGroups.size ? candidates.filter((exercise) => exercise.muscles.some((muscle) => targetGroups.has(muscle))) : candidates
+  const selected = [...targeted, ...candidates.filter((exercise) => !targeted.includes(exercise))].slice(0, Math.min(6, Math.max(4, candidates.length)))
+  return {
     id: crypto.randomUUID(),
-    title: `${config.label} — ${numericDuration} min`,
-    sport: profile.sport || 'Renforcement général',
+    title: `${config.label} · séance personnalisée`,
     bodyMass: Number(profile.bodyMass) || null,
     objective,
+    muscles: profile.muscles || [],
     variationNote: recentWorkouts.length ? 'Sélection alternée avec vos séances récentes pour limiter les répétitions.' : 'Première séance de cette préparation : les prochaines propositions varieront selon votre historique.',
-    targetDuration: numericDuration,
     scheduledFor: scheduledFor || null,
     status: scheduledFor ? 'planned' : 'generated',
     createdAt: new Date().toISOString(),
     startedAt: null,
     completedAt: null,
-    warmup: warmupFor(profile.sport, objective),
+    warmup: warmupFor(objective),
     safety: objective === 'pliometrie' ? 'La qualité des réceptions prime. Réduisez le volume si elles deviennent bruyantes ou instables.' : 'Arrêtez en cas de douleur et choisissez une difficulté qui permet de garder une technique propre.',
     exercises: selected.map((exercise) => prescribeExercise(exercise, objective, profile.level, profile.bodyMass)),
   }
-  return { ...workout, estimatedMinutes: estimateWorkoutMinutes(workout) }
 }
 
 export function refreshWorkout(workout) {
-  return { ...workout, estimatedMinutes: estimateWorkoutMinutes(workout), updatedAt: new Date().toISOString() }
+  return { ...workout, updatedAt: new Date().toISOString() }
 }

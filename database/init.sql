@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE TABLE IF NOT EXISTS profiles (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  display_name VARCHAR(100) NOT NULL DEFAULT '', sport VARCHAR(80) NOT NULL DEFAULT '',
+  display_name VARCHAR(100) NOT NULL DEFAULT '',
   level VARCHAR(30) NOT NULL DEFAULT 'debutant', body_mass NUMERIC(5,2),
   goals TEXT[] NOT NULL DEFAULT '{}', muscles TEXT[] NOT NULL DEFAULT '{}', equipment TEXT[] NOT NULL DEFAULT '{}',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -38,13 +38,16 @@ ALTER TABLE exercises ADD COLUMN IF NOT EXISTS instruction TEXT NOT NULL DEFAULT
 CREATE TABLE IF NOT EXISTS workouts (
   id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title VARCHAR(160) NOT NULL, objective VARCHAR(30) NOT NULL,
-  duration_minutes INTEGER NOT NULL CHECK (duration_minutes BETWEEN 30 AND 60), scheduled_for DATE,
+  scheduled_for DATE,
   status VARCHAR(20) NOT NULL DEFAULT 'generated' CHECK (status IN ('generated', 'planned', 'started', 'completed')),
   completed_at TIMESTAMPTZ, notes TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS workouts_user_scheduled_idx ON workouts(user_id, scheduled_for);
 CREATE INDEX IF NOT EXISTS workouts_user_status_idx ON workouts(user_id, status);
+
+ALTER TABLE profiles DROP COLUMN IF EXISTS sport;
+ALTER TABLE workouts DROP COLUMN IF EXISTS duration_minutes;
 
 CREATE TABLE IF NOT EXISTS workout_exercises (
   workout_id INTEGER NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
@@ -73,7 +76,7 @@ VALUES
 ('Développé épaules', ARRAY['Épaules', 'Triceps'], ARRAY['force', 'endurance'], 'Machine ou haltères', 20, 'Un mouvement de poussée au-dessus de la tête pour les épaules.', 'Utiliser une machine guidée et une amplitude partielle.', 'Augmenter légèrement la charge sans cambrer le dos.'),
 ('Curl biceps', ARRAY['Biceps', 'Avant-bras'], ARRAY['force', 'endurance'], 'Haltères', 12, 'Un exercice d’isolation des bras avec une charge facile à contrôler.', 'Utiliser un seul haltère et s’asseoir.', 'Ralentir la descente plutôt que de balancer le buste.'),
 ('Extension triceps à la poulie', ARRAY['Triceps'], ARRAY['force', 'endurance'], 'Poulie haute', 15, 'Un exercice d’isolation pour renforcer l’extension du coude.', 'Choisir une charge faible et garder les coudes près du corps.', 'Augmenter légèrement la charge sans bouger les épaules.'),
-('Planche', ARRAY['Abdominaux', 'Lombaires', 'Épaules'], ARRAY['force', 'endurance'], 'Poids du corps', 0, 'Un exercice de gainage pour apprendre à stabiliser le tronc.', 'Poser les genoux au sol et réduire la durée.', 'Ajouter du temps par petites étapes sans creuser le dos.'),
+('Planche', ARRAY['Abdominaux', 'Lombaires', 'Épaules'], ARRAY['force', 'endurance'], 'Poids du corps', 0, 'Un exercice de gainage pour apprendre à stabiliser le tronc.', 'Poser les genoux au sol et réduire le temps de maintien.', 'Ajouter du temps par petites étapes sans creuser le dos.'),
 ('Kettlebell swing', ARRAY['Fessiers', 'Ischio-jambiers', 'Lombaires', 'Épaules'], ARRAY['puissance', 'endurance'], 'Kettlebell', 20, 'Un mouvement explosif de hanche à réaliser dans un espace dégagé.', 'Apprendre la charnière de hanche sans charge.', 'Accélérer l’extension sans tirer avec les bras.'),
 ('Lancer de medecine-ball', ARRAY['Pectoraux', 'Épaules', 'Abdominaux'], ARRAY['puissance'], 'Medecine-ball', 8, 'Un exercice explosif pour développer la vitesse de production de force.', 'Utiliser un ballon léger et réduire l’amplitude du lancer.', 'Augmenter progressivement la vitesse sans perdre le contrôle.')
 ON CONFLICT (name) DO NOTHING;

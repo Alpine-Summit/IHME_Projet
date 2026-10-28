@@ -1,156 +1,95 @@
-# APEX — préparation physique pour athlètes
+# APEX — Assistant de préparation physique
 
-APEX est une application React/Vite qui propose des séances de préparation physique à partir du sport, du niveau, de l’objectif, des groupes musculaires et de la durée souhaitée. Le catalogue considère que l’utilisateur peut disposer du matériel nécessaire ; chaque exercice affiche toutefois son matériel requis.
+APEX est une application React/Vite qui construit une base de séance de renforcement personnalisée. L’utilisateur choisit son niveau, un objectif et les groupes musculaires à solliciter ; APEX propose 4 à 6 exercices cohérents, avec séries, répétitions, repos, consignes et variantes. La séance reste entièrement modifiable : remplacement, ajout, suppression, réorganisation et saisie des résultats réalisés.
 
-Le moteur sportif est déterministe et local : aucune API d’IA, aucun compte et aucune connexion ne sont nécessaires pour utiliser l’application.
+Le moteur est déterministe et local. Il ne dépend d’aucune IA ni d’un service payant pour générer une proposition. L’historique récent sert à varier les mouvements proposés sans écraser les choix manuels.
 
-## Fonctionnalités
+## Scénario de démonstration
 
-- profil local simplifié : nom, sport principal et masse facultative ;
-- sélection exhaustive des muscles ciblés directement au moment de la génération ;
-- objectifs distincts : force, puissance, endurance musculaire, pliométrie et renforcement général ;
-- catalogue d’exercices structuré et extensible dans `frontend/src/data/exercises.js` ;
-- moteur de sélection et de prescription dans `frontend/src/engine/workoutEngine.js` ;
-- échauffement, consignes, précautions et variantes ;
-- édition d’une séance : ajout, suppression, déplacement, séries, répétitions, repos et charge ;
-- recalcul de la durée estimée avec alerte si la cible est dépassée ;
-- fourchette de charge externe indicative, calculée prudemment selon le poids, le niveau et la famille de mouvement ;
-- mode entraînement avec exercice courant et performances réellement réalisées ;
-- calendrier mensuel, planification, historique et statuts `generated`, `planned`, `started`, `completed` ;
-- sauvegarde persistante dans IndexedDB ;
-- export/import JSON versionné avec validation et confirmation ;
-- interface responsive et accessible sur mobile et ordinateur.
+Un étudiant STAPS prépare une séance de renforcement général. Il indique son niveau, sélectionne « Renforcement général », coche « Quadriceps » et « Fessiers », puis lance la génération. Il vérifie les 4 à 6 mouvements proposés, remplace un exercice, réordonne la séance, renseigne ses charges et démarre le mode entraînement. À la fin, ses résultats apparaissent dans l’historique et la séance planifiée reste consultable dans le calendrier.
 
-## Cadrage du besoin — scénario de démonstration
+## Utilisation
 
-APEX s’adresse à un étudiant STAPS, coureur ou cycliste, qui veut préparer une séance de renforcement sans devoir construire seul les séries, répétitions et temps de repos. Il renseigne son nom, son sport, son poids facultatif, un objectif, les muscles ciblés et une durée. L’application propose alors une séance structurée ; l’utilisateur peut la modifier, la planifier, l’effectuer et enregistrer ses résultats.
-
-Scénario à présenter en une minute :
-
-1. Depuis « Créer », renseigner le profil et choisir « Force », « Quadriceps » et « Fessiers » pour 45 minutes.
-2. Cliquer sur « Proposer une séance » et vérifier que la date éventuelle crée une entrée dans le calendrier.
-3. Modifier les séries, le repos ou l’ordre des exercices ; la durée estimée et l’alerte de dépassement se mettent à jour.
-4. Cliquer sur « Commencer », renseigner une performance, puis « Terminer ».
-5. Retrouver la séance dans l’historique et l’exporter depuis « Sauvegarde ».
-
-## Modèle de données et unités
-
-Le fonctionnement local utilise un objet versionné sauvegardé dans IndexedDB : `profile` contient le nom, le sport, le niveau et la masse en kg ; `workouts` contient les séances ; chaque séance contient un statut, une date éventuelle, une durée cible en minutes et ses exercices. Les identifiants de séance sont uniques et les exercices du catalogue ont des identifiants stables.
-
-Le schéma PostgreSQL fourni par Docker reprend les mêmes notions pour préparer une évolution serveur : `users` possède la clé primaire de l’utilisateur, `workouts.user_id` référence cet utilisateur, et `workout_exercises.workout_id` référence la séance. Exemple de requête démontrable :
-
-```sql
-SELECT id, title, scheduled_for, status, duration_minutes
-FROM workouts
-WHERE user_id = 1
-ORDER BY scheduled_for NULLS LAST, created_at DESC;
+```bash
+npm install
+npm --prefix frontend install
+npm run dev
 ```
 
-Les durées sont en minutes, les repos en secondes, les charges en kilogrammes et la masse corporelle en kilogrammes. Les charges proposées restent indicatives : la masse corporelle seule ne permet pas de calculer une charge optimale.
+L’application est ensuite disponible sur `http://localhost:3000/` et sur le préfixe pédagogique configuré par le déploiement.
 
-## API et règle métier expliquable
+## Modèle de données
 
-Le moteur principal est local dans `frontend/src/engine/workoutEngine.js`. Il filtre d’abord les exercices compatibles avec l’objectif, le sport, le niveau et les muscles sélectionnés, puis applique une prescription adaptée à l’objectif. La durée estimée additionne le temps de travail, les repos et une marge de transition ; elle est recalculée après chaque modification.
+Le parcours principal conserve les données dans IndexedDB, sous un objet versionné :
 
-Exemple de cas limite à expliquer : si aucun exercice ne correspond au sport, au niveau ou à l’objectif, le moteur refuse de créer une séance et affiche un message compréhensible au lieu de produire une séance incohérente. Pour la pliométrie débutant, le volume reste limité et les consignes de réception apparaissent dans la séance.
+- `profile` : `displayName` (texte), `level` (enum), `bodyMass` (nombre facultatif) ;
+- `workouts` : `id` (UUID), `title`, `objective`, `muscles`, `scheduledFor`, `status`, dates de suivi et `exercises` ;
+- un exercice de séance contient `exerciseId`, `sets`, `reps`, `restSeconds`, `load` et `performance`.
 
-## Trois essais de vérification
+Pour le jalon PostgreSQL, [database/init.sql](./database/init.sql) décrit les tables `users`, `profiles`, `exercises`, `workouts` et `workout_exercises`. La clé primaire de `profiles` est aussi une clé étrangère vers `users`. Une séance est reliée à ses mouvements par `workout_id`.
 
-| Essai | Entrée | Résultat attendu |
-| --- | --- | --- |
-| Normal | Force, 45 min, Quadriceps + Fessiers, date choisie | Séance créée, exercices compatibles, durée affichée et séance présente au calendrier |
-| Vide | Aucun muscle sélectionné | Séance générale cohérente, sans erreur et sans sélection artificiellement imposée |
-| Limite | Modifier plusieurs exercices jusqu’à dépasser 45 min | Alerte de dépassement, durée recalculée, modifications conservées après rafraîchissement |
+Exemple de requête :
 
-Les tests automatisés couvrent la sélection par objectif/niveau, la pliométrie débutant, le recalcul de durée et la suggestion de charge. Les essais manuels ci-dessus servent à démontrer le parcours React complet.
+```sql
+SELECT w.id, w.title, w.objective, w.status, w.scheduled_for
+FROM workouts AS w
+WHERE w.user_id = $1
+ORDER BY COALESCE(w.scheduled_for, w.created_at) DESC;
+```
 
-La masse corporelle ne suffit jamais à déduire une charge optimale. Les charges externes sont saisies et ajustées par l’utilisateur. Les recommandations sont pédagogiques et ne remplacent pas l’avis d’un professionnel de santé ou d’un entraîneur qualifié.
+Les séries sont des entiers, les répétitions restent un format texte pour accepter `8–12` ou `30 s`, les repos sont exprimés en secondes et les charges en kilogrammes lorsque l’utilisateur les renseigne.
 
-Les fourchettes de charge sont des points de départ, jamais des prescriptions. Elles sont volontairement prudentes et disparaissent si le poids n’est pas renseigné ou si la charge d’une machine n’est pas comparable. L’utilisateur commence par le bas de la fourchette, garde environ 2 à 3 répétitions en réserve et réduit la charge si la technique se dégrade. Cette logique s’inspire des recommandations relatives à l’intensité de la [NSCA](https://dxpprod.nsca.com/education/articles/nsca-coach/using-intensity-based-on-sets-and-repetitions-over-50-years-of-experience-a-brief-overview/) et du consensus expert sur le choix des exercices chez les débutants ([Delphi study](https://pmc.ncbi.nlm.nih.gov/articles/PMC11873903/)). Les standards exprimés en multiples du poids du corps, comme ceux de [BarBend](https://barbend.com/squat-standards/), servent uniquement de repères de niveau et ne sont pas utilisés comme charges d’entraînement automatiques.
+## Règle métier
+
+La règle unique est implémentée dans [frontend/src/engine/workoutEngine.js](./frontend/src/engine/workoutEngine.js) et réutilisée par [backend/planner.js](./backend/planner.js) :
+
+1. filtrer les exercices compatibles avec l’objectif et le niveau ;
+2. prioriser les groupes musculaires sélectionnés ;
+3. écarter les mouvements récemment utilisés lorsque c’est possible ;
+4. prescrire les séries, répétitions et repos selon l’objectif ;
+5. renvoyer 4 à 6 exercices éditables.
+
+La masse corporelle ne produit jamais une charge obligatoire. Elle peut seulement afficher une fourchette prudente et modifiable pour certains mouvements avec charge externe.
+
+## Interface et persistance
+
+Les vues React sont : création, séance modifiable, mode entraînement, calendrier, historique et sauvegarde. Les changements sont enregistrés automatiquement dans IndexedDB. Une séance n’est terminée qu’après l’action « Terminer ».
+
+Les exports sont des JSON versionnés. L’import vérifie le format, la version, le profil et les séances avant de demander confirmation lorsque des données existent déjà. Une suppression du stockage du navigateur ou un changement d’appareil peut entraîner une perte : exportez régulièrement vos données.
+
+## Vérifications
+
+```bash
+npm test
+npm run lint
+npm run build
+docker build --build-arg BASE_PATH=/projet-ihme-p18/ -t apex .
+```
+
+Les tests couvrent le catalogue, la sélection par objectif/niveau/groupes musculaires, la variété liée à l’historique, les prescriptions prudentes, la génération de 4 à 6 exercices, les statuts planifiés et le refus des sauvegardes JSON invalides.
+
+| Cas | Entrée | Résultat attendu |
+|---|---|---|
+| Normal | Niveau intermédiaire, force, quadriceps | Proposition cohérente de 4 à 6 mouvements éditables |
+| Vide | Aucun groupe musculaire coché | Séance générale générée sans erreur |
+| Limite | Niveau invalide ou objectif inconnu | Message d’erreur compréhensible, aucune séance incohérente |
 
 ## Architecture
 
 ```text
-frontend/src/data/          catalogue indépendant de l’interface
-frontend/src/engine/        sélection, prescriptions et durée
-frontend/src/storage/       IndexedDB et import/export
-frontend/src/App.jsx        vues React et interactions
-backend/                    Node.js + Express + compatibilité PostgreSQL
-database/init.sql           schéma et catalogue SQL pour Docker
-Dockerfile                  image production frontend + API
-docker-compose.yml          environnement local Node/PostgreSQL
+frontend/src/
+  App.jsx                    interface et navigation
+  data/                      catalogue et référentiels
+  engine/                    sélection et prescriptions
+  storage/                   IndexedDB et JSON
+backend/
+  server.js                  Express, API et livraison de l’interface
+  planner.js                 adaptateur vers la règle métier commune
+database/init.sql            schéma PostgreSQL de démonstration
 ```
 
-Les données personnelles restent dans le navigateur. Le backend Node.js et PostgreSQL sont conservés pour l’exécution Docker, la santé du service et l’évolution future du catalogue ; l’application locale ne dépend pas d’un compte distant. APEX est un assistant : sa proposition n’impose jamais la séance finale.
+Le [Dockerfile](./Dockerfile) compile le frontend puis sert les fichiers statiques avec Express. PostgreSQL est disponible via [docker-compose.yml](./docker-compose.yml) pour le jalon de modèle de données et l’API. Le parcours local n’exige pas de compte pour conserver les données dans le navigateur.
 
-Le backend Node.js réutilise directement le moteur de `frontend/src/engine/workoutEngine.js` : il n’existe plus de seconde règle de génération. Le catalogue React est donc la source commune de la sélection, des prescriptions et du calcul de durée.
+## Limites et suite possible
 
-## Développement local
-
-Pré-requis : Node.js 24, npm et Docker Desktop si PostgreSQL est utilisé.
-
-Pour lancer le frontend en mode développement :
-
-```sh
-cd IHME_Projet
-npm ci --prefix frontend
-npm run dev:frontend
-```
-
-Ouvrir l’URL affichée par Vite, généralement `http://localhost:5173`.
-
-Pour lancer l’API Node.js et PostgreSQL avec Docker :
-
-```sh
-cp .env.example .env
-docker compose up --build
-```
-
-L’application est alors disponible sur `http://localhost:3000`. Le service `db` est PostgreSQL ; le service `app` construit l’interface React puis la sert avec Express. Le volume Docker conserve les données PostgreSQL entre deux arrêts.
-
-Pour arrêter les conteneurs :
-
-```sh
-docker compose down
-```
-
-Éviter `docker compose down -v` si le volume PostgreSQL doit être conservé.
-
-## Vérifications
-
-```sh
-npm test
-npm run lint
-npm run build
-docker compose config
-docker build -t move:local .
-```
-
-Les tests couvrent la prescription par objectif et niveau, la sélection liée aux muscles, la pliométrie débutant et le recalcul de durée. La CI exécute les tests, le lint, le build et la construction Docker.
-
-## Sauvegarde des données
-
-Utiliser « Exporter » régulièrement. L’export contient le profil local, les séances, les modifications et les performances réellement réalisées. L’import vérifie le format et la version ; si des séances existent déjà, une confirmation est demandée avant remplacement.
-
-La suppression des données du navigateur ou le changement d’appareil peut faire perdre les données locales si elles n’ont pas été exportées. Aucune synchronisation cloud n’est activée.
-
-## Docker et publication GitHub
-
-Le [Dockerfile](./Dockerfile) utilise une étape de build Node.js pour compiler Vite, puis une image runtime plus légère qui exécute Express. PostgreSQL est fourni séparément par [docker-compose.yml](./docker-compose.yml).
-
-Le workflow [`.github/workflows/publish.yml`](./.github/workflows/publish.yml) :
-
-1. installe les dépendances ;
-2. lance les tests, le lint et le build ;
-3. construit une image Linux avec Docker ;
-4. publie l’image dans GHCR ;
-5. ne déploie que si le workflow est lancé manuellement avec l’option de déploiement et les secrets du serveur configurés.
-
-Les secrets et les fichiers `.env` ne doivent jamais être commités.
-
-## Limites connues et prochaines évolutions
-
-- Les données personnelles restent propres au navigateur : la suppression du stockage ou le changement d’appareil peut les faire disparaître sans export JSON.
-- PostgreSQL est actuellement préparé pour le déploiement et l’évolution future ; le parcours principal local ne nécessite pas de compte.
-- Le catalogue et le moteur local sont la source de vérité de la génération. Une prochaine évolution pourra partager ces règles avec l’API pour éviter deux moteurs métier.
-- Une prochaine étape recommandée est d’ajouter des tests end-to-end du parcours création → calendrier → entraînement → historique, puis un test de démarrage Docker/PostgreSQL dans la CI.
+Le moteur reste une aide à la préparation : il ne remplace pas l’analyse d’un professionnel et ne garantit pas une performance ou l’absence de blessure. La prochaine évolution pertinente serait un test end-to-end du parcours complet et une authentification cloud optionnelle, uniquement avec accord explicite de l’utilisateur.
