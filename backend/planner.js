@@ -8,6 +8,7 @@ export function buildWorkout(databaseExercises = [], profile = {}) {
   const workout = generateWorkout(profile, {
     objective: profile.objective || 'general',
     scheduledFor: profile.scheduledFor || null,
+    title: profile.title || '',
   })
   const idsByName = new Map(databaseExercises.map((exercise) => [exercise.name, exercise.id]))
   return {

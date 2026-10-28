@@ -14,28 +14,29 @@ function openDatabase() {
 }
 
 export async function readAppData(fallback) {
-  if (!('indexedDB' in window)) return fallback
+  if (!('indexedDB' in window)) throw new Error('IndexedDB indisponible dans ce navigateur.')
+  const database = await openDatabase()
   try {
-    const database = await openDatabase()
-    const result = await new Promise((resolve, reject) => {
+    return await new Promise((resolve, reject) => {
       const request = database.transaction(STORE).objectStore(STORE).get('data')
       request.onsuccess = () => resolve(request.result || fallback)
       request.onerror = () => reject(request.error)
     })
+  } finally {
     database.close()
-    return result
-  } catch {
-    return fallback
   }
 }
 
 export async function writeAppData(data) {
   if (!('indexedDB' in window)) throw new Error('IndexedDB indisponible dans ce navigateur.')
   const database = await openDatabase()
-  await new Promise((resolve, reject) => {
-    const request = database.transaction(STORE, 'readwrite').objectStore(STORE).put(data, 'data')
-    request.onsuccess = resolve
-    request.onerror = () => reject(request.error)
-  })
-  database.close()
+  try {
+    await new Promise((resolve, reject) => {
+      const request = database.transaction(STORE, 'readwrite').objectStore(STORE).put(data, 'data')
+      request.onsuccess = resolve
+      request.onerror = () => reject(request.error)
+    })
+  } finally {
+    database.close()
+  }
 }

@@ -15,11 +15,23 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE TABLE IF NOT EXISTS profiles (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  display_name VARCHAR(100) NOT NULL DEFAULT '',
-  level VARCHAR(30) NOT NULL DEFAULT 'debutant', body_mass NUMERIC(5,2),
+  first_name VARCHAR(40) NOT NULL DEFAULT '',
+  body_mass NUMERIC(5,2),
   goals TEXT[] NOT NULL DEFAULT '{}', muscles TEXT[] NOT NULL DEFAULT '{}', equipment TEXT[] NOT NULL DEFAULT '{}',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS first_name VARCHAR(40) NOT NULL DEFAULT '';
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema() AND table_name = 'profiles' AND column_name = 'display_name'
+  ) THEN
+    EXECUTE 'UPDATE profiles SET first_name = left(split_part(trim(display_name), '' '', 1), 40) WHERE first_name = '''' AND display_name IS NOT NULL AND trim(display_name) <> ''''';
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS exercises (
   id SERIAL PRIMARY KEY,
@@ -47,14 +59,18 @@ CREATE INDEX IF NOT EXISTS workouts_user_scheduled_idx ON workouts(user_id, sche
 CREATE INDEX IF NOT EXISTS workouts_user_status_idx ON workouts(user_id, status);
 
 ALTER TABLE profiles DROP COLUMN IF EXISTS sport;
+ALTER TABLE profiles DROP COLUMN IF EXISTS display_name;
+ALTER TABLE profiles DROP COLUMN IF EXISTS level;
 ALTER TABLE workouts DROP COLUMN IF EXISTS duration_minutes;
 
 CREATE TABLE IF NOT EXISTS workout_exercises (
   workout_id INTEGER NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
   exercise_id INTEGER NOT NULL REFERENCES exercises(id), order_index INTEGER NOT NULL,
-  sets INTEGER NOT NULL, reps VARCHAR(30) NOT NULL, rest_seconds INTEGER NOT NULL, difficulty VARCHAR(30) NOT NULL,
+  sets INTEGER NOT NULL, reps VARCHAR(30) NOT NULL, rest_seconds INTEGER NOT NULL,
   PRIMARY KEY (workout_id, order_index)
 );
+
+ALTER TABLE workout_exercises DROP COLUMN IF EXISTS difficulty;
 
 ALTER TABLE exercises ADD COLUMN IF NOT EXISTS load_percentage NUMERIC(5, 2) NOT NULL DEFAULT 0;
 

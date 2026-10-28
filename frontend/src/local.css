@@ -10,7 +10,24 @@
   line-height: 1.5;
 }
 
-.brand-button { padding: 0; text-align: left; }
+.brand-button { padding: 0; text-align: left; background: transparent; }
+.brand-button { min-width: 220px; }
+.apex-logo { display: block; width: 214px; height: 58px; object-fit: contain; object-position: left center; }
+.profile-compact { background: linear-gradient(135deg, #fffdf8 0%, #f4f1e8 100%); }
+.profile-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.weight-field { display: block; max-width: 440px; font-size: 12px; font-weight: 700; }
+.weight-field > span, .field-hint { color: var(--muted); font-size: 11px; font-weight: 500; }
+.profile-fields .weight-field { max-width: none; }
+.profile-fields .weight-field > input { display: block; width: 100%; margin-top: 8px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; }
+.profile-fields .weight-field > input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px #d6ad6330; }
+.input-suffix { position: relative; margin-top: 8px; }
+.input-suffix input { width: 100%; padding: 13px 48px 13px 14px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; }
+.input-suffix b { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); color: var(--muted); font-size: 12px; }
+.weight-field small { margin-top: 8px; }
+.hero-greeting { margin: 0 0 8px; color: #e3c37f; font-size: 13px; font-weight: 700; letter-spacing: .04em; }
+.generator > label { margin-top: 22px; }
+.generator > label > input { display: block; }
+.generator input[type="checkbox"] { width: auto; }
 .replace-row { display: flex; gap: 8px; margin-top: 18px; }
 .replace-row select { flex: 1; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: #fff; }
 .replace-row button:disabled { cursor: not-allowed; opacity: .5; }
@@ -19,7 +36,7 @@
 @media (min-width: 821px) {
   .app { max-width: 1440px; padding: 30px 56px 64px; }
   .topbar { max-width: 1180px; margin: 0 auto 48px; min-height: 42px; }
-  .welcome { max-width: 1180px; min-height: 340px; margin: 0 auto 30px; padding: 64px 66px; }
+  .welcome { max-width: 1180px; min-height: 400px; margin: 0 auto 30px; padding: 72px 72px; background-image: linear-gradient(90deg, rgba(16, 32, 32, .97) 0%, rgba(16, 32, 32, .90) 48%, rgba(16, 32, 32, .56) 100%), url('./assets/apex-hero.svg'); background-position: center, center; background-size: cover; }
   .welcome h1 { max-width: 760px; font-size: clamp(48px, 5vw, 72px); }
   .profile, .dashboard-grid { width: min(100%, 980px); margin-left: auto; margin-right: auto; }
   .profile { margin-bottom: 30px; }
@@ -39,6 +56,12 @@
 }
 
 @media (max-width: 480px) {
+  .profile-fields { grid-template-columns: 1fr; gap: 0; }
+  .profile .panel-heading { flex-direction: column; }
+  .profile .badge { white-space: normal; }
+  .apex-logo { width: 174px; height: 47px; }
+  .brand-button { min-width: auto; }
+  .welcome { background-image: linear-gradient(90deg, rgba(16, 32, 32, .94), rgba(16, 32, 32, .84)), url('./assets/apex-hero.svg'); background-position: center; background-size: cover; }
   .replace-row { align-items: stretch; flex-direction: column; }
   .replace-row button { width: 100%; }
 }

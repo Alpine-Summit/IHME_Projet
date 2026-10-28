@@ -1,11 +1,23 @@
-export const DATA_VERSION = 2
+export const DATA_VERSION = 4
 
 function isValidProfile(profile) {
-  return profile && typeof profile === 'object' && typeof profile.displayName === 'string' && ['debutant', 'intermediaire', 'avance'].includes(profile.level)
+  return profile
+    && typeof profile === 'object'
+    && !Array.isArray(profile)
+    && (profile.firstName == null || (typeof profile.firstName === 'string' && profile.firstName.length <= 40))
+    && (profile.bodyMass == null || profile.bodyMass === '' || (Number.isFinite(Number(profile.bodyMass)) && Number(profile.bodyMass) >= 20 && Number(profile.bodyMass) <= 300))
 }
 
 function isValidWorkout(workout) {
-  return workout && typeof workout === 'object' && typeof workout.id === 'string' && typeof workout.title === 'string' && Array.isArray(workout.exercises) && ['generated', 'planned', 'started', 'completed'].includes(workout.status)
+  return workout
+    && typeof workout === 'object'
+    && !Array.isArray(workout)
+    && typeof workout.id === 'string'
+    && typeof workout.title === 'string'
+    && workout.title.length <= 100
+    && Array.isArray(workout.exercises)
+    && workout.exercises.every((exercise) => exercise && typeof exercise === 'object' && !Array.isArray(exercise))
+    && ['generated', 'planned', 'started', 'completed'].includes(workout.status)
 }
 
 export function exportData(data) {
@@ -21,6 +33,8 @@ export function exportData(data) {
 export function parseImport(text) {
   let payload
   try { payload = JSON.parse(text) } catch { throw new Error('Le fichier sélectionné n’est pas un JSON valide.') }
-  if (payload?.format !== 'apex-training-data' || payload.version !== DATA_VERSION || !isValidProfile(payload.data?.profile) || !Array.isArray(payload.data.workouts) || !payload.data.workouts.every(isValidWorkout)) throw new Error('Ce fichier n’est pas une sauvegarde APEX valide ou sa version est incompatible.')
+  const supportedFormats = ['apex-training-data', 'move-training-data']
+  const supportedVersions = [1, 2, 3, DATA_VERSION]
+  if (!supportedFormats.includes(payload?.format) || !supportedVersions.includes(payload.version) || !isValidProfile(payload.data?.profile) || !Array.isArray(payload.data.workouts) || !payload.data.workouts.every(isValidWorkout)) throw new Error('Ce fichier n’est pas une sauvegarde APEX valide ou sa version est incompatible.')
   return payload.data
 }

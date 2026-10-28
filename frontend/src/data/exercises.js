@@ -1,7 +1,6 @@
 import { EXTRA_EXERCISES } from './exerciseCatalogExpanded.js'
 
 export const LEVELS = ['debutant', 'intermediaire', 'avance']
-export const LEVEL_LABELS = { debutant: 'Débutant', intermediaire: 'Intermédiaire', avance: 'Avancé' }
 export const OBJECTIVES = [
   { id: 'force', label: 'Force', sets: 3, reps: '5–8', restSeconds: 120, effort: 'RPE 6–8' },
   { id: 'puissance', label: 'Puissance', sets: 3, reps: '3–6', restSeconds: 120, effort: 'Qualité maximale' },
