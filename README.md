@@ -1,6 +1,6 @@
-# Move — préparation physique personnalisée
+# APEX — préparation physique pour athlètes
 
-Move est une application React/Vite qui propose des séances de préparation physique à partir du sport, du niveau, de l’objectif, des groupes musculaires et de la durée souhaitée. Le catalogue considère que l’utilisateur peut disposer du matériel nécessaire ; chaque exercice affiche toutefois son matériel requis.
+APEX est une application React/Vite qui propose des séances de préparation physique à partir du sport, du niveau, de l’objectif, des groupes musculaires et de la durée souhaitée. Le catalogue considère que l’utilisateur peut disposer du matériel nécessaire ; chaque exercice affiche toutefois son matériel requis.
 
 Le moteur sportif est déterministe et local : aucune API d’IA, aucun compte et aucune connexion ne sont nécessaires pour utiliser l’application.
 
@@ -23,7 +23,7 @@ Le moteur sportif est déterministe et local : aucune API d’IA, aucun compte e
 
 ## Cadrage du besoin — scénario de démonstration
 
-Move s’adresse à un étudiant STAPS, coureur ou cycliste, qui veut préparer une séance de renforcement sans devoir construire seul les séries, répétitions et temps de repos. Il renseigne son nom, son sport, son poids facultatif, un objectif, les muscles ciblés et une durée. L’application propose alors une séance structurée ; l’utilisateur peut la modifier, la planifier, l’effectuer et enregistrer ses résultats.
+APEX s’adresse à un étudiant STAPS, coureur ou cycliste, qui veut préparer une séance de renforcement sans devoir construire seul les séries, répétitions et temps de repos. Il renseigne son nom, son sport, son poids facultatif, un objectif, les muscles ciblés et une durée. L’application propose alors une séance structurée ; l’utilisateur peut la modifier, la planifier, l’effectuer et enregistrer ses résultats.
 
 Scénario à présenter en une minute :
 
@@ -81,7 +81,7 @@ Dockerfile                  image production frontend + API
 docker-compose.yml          environnement local Node/PostgreSQL
 ```
 
-Les données personnelles restent dans le navigateur. Le backend Node.js et PostgreSQL sont conservés pour l’exécution Docker, la santé du service et l’évolution future du catalogue ; l’application locale ne dépend pas d’un compte distant. Move est un assistant : sa proposition n’impose jamais la séance finale.
+Les données personnelles restent dans le navigateur. Le backend Node.js et PostgreSQL sont conservés pour l’exécution Docker, la santé du service et l’évolution future du catalogue ; l’application locale ne dépend pas d’un compte distant. APEX est un assistant : sa proposition n’impose jamais la séance finale.
 
 Le backend Node.js réutilise directement le moteur de `frontend/src/engine/workoutEngine.js` : il n’existe plus de seconde règle de génération. Le catalogue React est donc la source commune de la sélection, des prescriptions et du calcul de durée.
 

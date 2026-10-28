@@ -13,8 +13,10 @@ RUN npm run build
 
 FROM node:24-bookworm-slim AS runtime
 
+ARG BASE_PATH=/
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV BASE_PATH=${BASE_PATH}
 WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev && npm cache clean --force

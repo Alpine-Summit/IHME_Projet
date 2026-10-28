@@ -1,14 +1,1 @@
-/* Local visual adjustments live here so the main stylesheet stays compact. */
-.calendar-event{display:flex;align-items:stretch;gap:3px;padding:0;background:transparent}
-.calendar-event>button:first-child{flex:1;padding:7px;text-align:left;border-radius:4px;background:#e9f0d0;color:#40521d;font-size:10px}
-.calendar-open{display:flex;flex-direction:column;gap:3px}
-.calendar-open b{font-size:9px;letter-spacing:.04em;text-transform:uppercase}
-.calendar-open span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.calendar-event.completed>button:first-child{background:#dce8ed;color:#385767}
-.calendar-delete{width:24px;padding:0;border-radius:4px;background:#f6e4df;color:#a34737;font-weight:700}
-.history-item{display:flex;align-items:center;justify-content:space-between;gap:16px}
-.history-open{display:flex;flex:1;flex-direction:column;gap:6px;text-align:left;background:transparent;color:var(--ink)}
-.profile{margin-bottom:24px;background:linear-gradient(135deg,#fffefa,#f8f3e8)}
-.generator{max-width:820px;border-top:3px solid var(--accent)}
-.generator h2{font-size:30px}
-.load-suggestion{margin:15px 0 0;padding:11px 13px;border-left:3px solid var(--accent);border-radius:3px;background:#f8f3e8;color:#6b5735;font-size:11px;line-height:1.5}
+/* Styles locaux conservés pour les extensions futures. */
