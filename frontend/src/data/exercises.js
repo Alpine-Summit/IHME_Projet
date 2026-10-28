@@ -1,3 +1,5 @@
+import { EXTRA_EXERCISES } from './exerciseCatalogExpanded.js'
+
 export const SPORTS = ['Course à pied', 'Cyclisme', 'Renforcement général', 'Autre']
 export const LEVELS = ['debutant', 'intermediaire', 'avance']
 export const LEVEL_LABELS = { debutant: 'Débutant', intermediaire: 'Intermédiaire', avance: 'Avancé' }
@@ -8,7 +10,7 @@ export const OBJECTIVES = [
   { id: 'pliometrie', label: 'Pliométrie', sets: 3, reps: '4–8', restSeconds: 90, effort: 'Réceptions maîtrisées' },
   { id: 'general', label: 'Renforcement général', sets: 2, reps: '8–12', restSeconds: 75, effort: 'RPE 6–7' },
 ]
-export const MUSCLE_GROUPS = ['Quadriceps', 'Ischio-jambiers', 'Fessiers', 'Adducteurs', 'Abducteurs', 'Mollets', 'Tibial antérieur', 'Pectoraux', 'Grand dorsal', 'Trapèzes', 'Rhomboïdes', 'Épaules', 'Biceps', 'Triceps', 'Avant-bras', 'Abdominaux', 'Obliques', 'Lombaires', 'Fléchisseurs de hanche']
+export const MUSCLE_GROUPS = ['Quadriceps', 'Ischio-jambiers', 'Fessiers', 'Adducteurs', 'Abducteurs', 'Mollets', 'Tibial antérieur', 'Pectoraux', 'Grand dorsal', 'Trapèzes', 'Rhomboïdes', 'Épaules', 'Biceps', 'Triceps', 'Avant-bras', 'Abdominaux', 'Obliques', 'Lombaires', 'Fléchisseurs de hanche', 'Hanches']
 
 export const EXERCISES = [
   { id: 'squat-bodyweight', name: 'Squat au poids du corps', description: 'Flexion de jambes contrôlée avec maintien du tronc.', objectives: ['force', 'endurance', 'general'], muscles: ['Quadriceps', 'Fessiers'], group: 'Jambes', equipment: ['Poids du corps'], levels: LEVELS, sports: ['Course à pied', 'Cyclisme', 'Renforcement général', 'Autre'], instruction: 'Gardez les genoux dans l’axe des pieds et remontez en poussant le sol.', errors: 'Genoux qui rentrent, talons qui se décollent ou amplitude forcée.', precautions: 'Réduire l’amplitude en cas de douleur ou de perte d’équilibre.', easier: 'Squat vers une chaise', harder: 'Goblet squat léger' },
@@ -49,6 +51,7 @@ export const EXERCISES = [
   { id: 'pogo-jump', name: 'Rebond de cheville', description: 'Petits rebonds verticaux pour introduire la réactivité de cheville.', objectives: ['puissance', 'pliometrie'], muscles: ['Mollets', 'Tibial antérieur'], group: 'Jambes', equipment: ['Poids du corps'], levels: ['intermediaire', 'avance'], sports: ['Course à pied', 'Cyclisme'], instruction: 'Gardez les contacts courts et les réceptions silencieuses.', errors: 'Augmenter le volume malgré une technique dégradée.', precautions: 'Surface adaptée et faible volume initial.', easier: 'Élévations de mollets rapides', harder: 'Rebonds alternés' },
   { id: 'broad-jump', name: 'Saut horizontal', description: 'Projection horizontale avec réception maîtrisée.', objectives: ['puissance', 'pliometrie'], muscles: ['Quadriceps', 'Fessiers', 'Mollets', 'Abdominaux'], group: 'Jambes', equipment: ['Poids du corps'], levels: ['intermediaire', 'avance'], sports: ['Course à pied', 'Renforcement général'], instruction: 'Sautez loin sans sacrifier la stabilité de la réception.', errors: 'Chercher la distance au détriment du contrôle.', precautions: 'Zone dégagée et retour en marchant.', easier: 'Saut vertical bas', harder: 'Saut avec départ unilatéral' },
   { id: 'sled-push', name: 'Poussée de traîneau', description: 'Poussée résistée adaptable à la force et à l’endurance.', objectives: ['force', 'puissance', 'endurance'], muscles: ['Quadriceps', 'Fessiers', 'Mollets', 'Épaules'], group: 'Jambes', equipment: ['Machines'], levels: LEVELS, sports: ['Course à pied', 'Cyclisme', 'Renforcement général'], instruction: 'Inclinez le corps en gardant les bras actifs et avancez régulièrement.', errors: 'Dos arrondi ou charge qui impose une perte de posture.', precautions: 'Surface et distance adaptées.', easier: 'Charge légère', harder: 'Poussée plus courte et plus intense' },
+  ...EXTRA_EXERCISES,
 ]
 
 export const findExercise = (id) => EXERCISES.find((exercise) => exercise.id === id)

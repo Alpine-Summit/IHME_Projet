@@ -1,8 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { EXERCISES } from '../data/exercises.js'
 import { estimateWorkoutMinutes, generateWorkout, selectExercises } from './workoutEngine.js'
 
 const profile = { sport: 'Course à pied', level: 'debutant', muscles: ['Quadriceps', 'Abdominaux'], equipment: ['Poids du corps'] }
+
+test('exercise catalog is rich and uses stable unique identifiers', () => {
+  assert.ok(EXERCISES.length >= 100)
+  assert.equal(new Set(EXERCISES.map((exercise) => exercise.id)).size, EXERCISES.length)
+  assert.ok(EXERCISES.every((exercise) => exercise.description && exercise.instruction && exercise.precautions && exercise.easier && exercise.harder))
+})
 
 test('selection respects objective, level and muscle priorities', () => {
   const selected = selectExercises({ ...profile, objective: 'force' })
