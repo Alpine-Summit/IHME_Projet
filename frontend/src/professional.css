@@ -31,10 +31,10 @@ body {
   content: '';
 }
 .app.page-home::before {
-  background-image: linear-gradient(115deg, rgba(240, 244, 238, .88), rgba(233, 239, 234, .72)), url('./assets/performance-home.jpg');
+  background-image: linear-gradient(115deg, rgba(240, 244, 238, .78), rgba(233, 239, 234, .62)), url('./assets/performance-home.jpg');
 }
 .app.page-calendar::before {
-  background-image: linear-gradient(115deg, rgba(239, 244, 240, .88), rgba(231, 238, 235, .72)), url('./assets/performance-calendar.jpg');
+  background-image: linear-gradient(115deg, rgba(239, 244, 240, .68), rgba(231, 238, 235, .52)), url('./assets/performance-calendar.jpg');
 }
 .app.page-workout::before {
   background-image: linear-gradient(115deg, rgba(241, 242, 235, .9), rgba(235, 239, 231, .76)), url('./assets/performance-workout.jpg');
@@ -68,7 +68,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   border: 1px solid #29483d;
   border-radius: 24px;
   background-image:
-    linear-gradient(94deg, rgba(14, 33, 30, .92) 0%, rgba(18, 45, 37, .70) 48%, rgba(18, 45, 37, .30) 100%),
+    linear-gradient(94deg, rgba(14, 33, 30, .88) 0%, rgba(18, 45, 37, .62) 48%, rgba(18, 45, 37, .26) 100%),
     url('./assets/performance-hero.jpg');
   background-position: center;
   background-size: cover;
