@@ -126,12 +126,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .workout-view { max-width: 1320px; margin: 0 auto; }
 .workout-heading { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 20px; }
 .workout-heading .text-button { justify-self: start; padding-left: 0; }
-.status-badge { display: inline-flex; align-items: center; min-height: 34px; padding: 7px 12px; border-radius: 99px; background: #edf1ed; color: var(--ink); font-size: 12px; font-weight: 700; white-space: nowrap; }
-.status-badge.planned, .status-dot.planned { background: #f2e7d2; color: #725322; }
-.status-badge.started, .status-dot.started { background: #dcebe3; color: #2f624b; }
-.status-badge.completed, .status-dot.completed { background: #dce8ed; color: #385767; }
-.status-badge.postponed, .status-dot.postponed { background: #f3e6cf; color: #725322; }
-.status-badge.cancelled, .status-dot.cancelled { background: #f5e1dc; color: #8d3932; }
+.status-badge { display: inline-flex; align-items: center; min-height: 34px; padding: 7px 12px; border: 1px solid transparent; border-radius: 99px; background: #edf1ed; color: var(--ink); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.status-badge.planned, .status-dot.planned { border-color: #b98516; background: #ffedb5; color: #674600; }
+.status-badge.started, .status-dot.started { border-color: #378052; background: #c7efd6; color: #14532d; }
+.status-badge.completed, .status-dot.completed { border-color: #3976a8; background: #cce5ff; color: #124b7a; }
+.status-badge.postponed, .status-dot.postponed { border-color: #c36b1b; background: #ffd7a3; color: #7c3600; }
+.status-badge.cancelled, .status-dot.cancelled { border-color: #bb5148; background: #ffd7d3; color: #8b1e18; }
 .workout-tabs { display: flex; gap: 8px; max-width: 1320px; margin: 0 auto 18px; padding: 5px; border: 1px solid var(--line); border-radius: 12px; background: #e8eee8; }
 .workout-tabs button { padding: 10px 16px; border-radius: 8px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; }
 .workout-tabs button.active { background: var(--paper); color: var(--ink); box-shadow: 0 3px 12px #172a2715; }
@@ -193,8 +193,8 @@ input:disabled, select:disabled, textarea:disabled { background: #f0f2ed !import
 .journal-panel > label { display: block; margin-top: 18px; font-size: 13px; font-weight: 700; }
 .journal-panel > label select { display: block; width: 100%; margin-top: 8px; }
 .status-legend { display: flex; flex-wrap: wrap; gap: 15px; max-width: 1320px; margin: 0 auto 14px; }
-.status-legend > span { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
-.status-dot { width: 11px; height: 11px; border-radius: 50%; }
+.status-legend > span { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: 12px; font-weight: 600; }
+.status-dot { width: 12px; height: 12px; border: 1px solid currentColor; border-radius: 50%; }
 .month-controls { display: flex; align-items: center; gap: 14px; }
 .month-controls strong { min-width: 160px; text-align: center; text-transform: capitalize; }
 .calendar-grid { max-width: 1320px; margin-right: auto; margin-left: auto; }
@@ -203,16 +203,17 @@ input:disabled, select:disabled, textarea:disabled { background: #f0f2ed !import
 .calendar-day.today { background: #f7f4e9; }
 .calendar-day > strong { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; font-size: 13px; }
 .calendar-event { margin-top: 6px; padding: 4px; border-radius: 8px; }
-.calendar-event.planned { background: #f7f0e2; }
-.calendar-event.started { background: #e8f1eb; }
-.calendar-event.completed { background: #e6eef1; }
-.calendar-event.postponed { background: #f6efdf; }
-.calendar-event.cancelled { background: #f8e9e5; }
+.calendar-event.planned { background: #ffedb5; }
+.calendar-event.started { background: #c7efd6; }
+.calendar-event.completed { background: #cce5ff; }
+.calendar-event.postponed { background: #ffd7a3; }
+.calendar-event.cancelled { background: #ffd7d3; }
 .calendar-event > button:first-child { padding: 6px; border-radius: 5px; background: transparent; font-size: 11px; }
-.calendar-event.planned > button:first-child, .calendar-event.postponed > button:first-child { color: #725322; }
-.calendar-event.started > button:first-child { color: #2f624b; }
-.calendar-event.completed > button:first-child { color: #385767; }
-.calendar-event.cancelled > button:first-child { color: #8d3932; }
+.calendar-event.planned > button:first-child { color: #674600; }
+.calendar-event.postponed > button:first-child { color: #7c3600; }
+.calendar-event.started > button:first-child { color: #14532d; }
+.calendar-event.completed > button:first-child { color: #124b7a; }
+.calendar-event.cancelled > button:first-child { color: #8b1e18; }
 .calendar-open b { font-size: 10px; }
 .calendar-open span { font-size: 11px; white-space: normal; overflow-wrap: anywhere; }
 .calendar-delete { flex: 0 0 34px; width: 34px; min-height: 34px; border-radius: 7px; font-size: 17px; }
