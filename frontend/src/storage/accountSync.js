@@ -1,3 +1,5 @@
+import { apiUrl } from './apiUrl.js'
+
 function modifiedAt(workout) {
   const timestamp = Date.parse(workout.updatedAt || workout.createdAt || 0)
   return Number.isFinite(timestamp) ? timestamp : 0
@@ -69,7 +71,7 @@ export async function syncLocalWorkouts(localWorkouts, request = fetch) {
 
   let response
   try {
-    response = await request('/api/workouts/sync', { credentials: 'same-origin' })
+    response = await request(apiUrl('/workouts/sync'), { credentials: 'same-origin' })
   } catch (error) {
     fail('Connexion au serveur interrompue.', error)
   }
@@ -86,7 +88,7 @@ export async function syncLocalWorkouts(localWorkouts, request = fetch) {
       updatedAt: timestampForSync(workout),
     }
     try {
-      response = await request(`/api/workouts/${encodeURIComponent(workout.id)}/sync`, {
+      response = await request(apiUrl(`/workouts/${encodeURIComponent(workout.id)}/sync`), {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },

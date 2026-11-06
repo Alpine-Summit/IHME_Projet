@@ -7,6 +7,7 @@ import { Pool } from 'pg'
 import { buildWorkout, objectives } from './planner.js'
 import { isWorkoutId, validateWorkoutForSync } from './workoutSync.js'
 import { initializeDatabase } from './database.js'
+import { stripApiBasePath } from './apiPath.js'
 import { EXERCISES } from '../frontend/src/data/exercises.js'
 
 const app = express()
@@ -33,6 +34,10 @@ app.use((request, response, next) => {
     const origin = request.get('origin')
     if (origin && origin !== process.env.PUBLIC_ORIGIN) return response.status(403).json({ error: 'Origine refusée.' })
   }
+  next()
+})
+app.use((request, _response, next) => {
+  request.url = stripApiBasePath(request.url, basePath)
   next()
 })
 

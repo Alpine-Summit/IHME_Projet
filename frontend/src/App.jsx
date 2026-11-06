@@ -8,6 +8,7 @@ import { generateWorkout, MIN_WORKOUT_EXERCISES, prescribeExercise, refreshWorko
 import { beginWorkout, completeWorkout, createRealization, snapshotWorkout } from './engine/workoutLifecycle'
 import { exportData, parseImport } from './storage/dataTransfer'
 import { mergeWorkoutLists, syncLocalWorkouts } from './storage/accountSync'
+import { apiUrl } from './storage/apiUrl'
 import { readAppData, writeAppData } from './storage/indexedDb'
 
 const emptyProfile = { firstName: '', bodyMass: '' }
@@ -34,7 +35,7 @@ async function accountResult(response) {
 async function accountRequest(path, options = {}) {
   let response
   try {
-    response = await fetch(path, { credentials: 'same-origin', ...options })
+    response = await fetch(apiUrl(path), { credentials: 'same-origin', ...options })
   } catch {
     throw new Error('Impossible de joindre le service de compte. Vérifiez la connexion au serveur.')
   }
@@ -118,7 +119,7 @@ function App() {
 
   useEffect(() => {
     let active = true
-    fetch('/api/me', { credentials: 'same-origin' })
+    fetch(apiUrl('/me'), { credentials: 'same-origin' })
       .then(async (response) => {
         if (response.status === 401) {
           if (active) setAccountService({ status: 'available', message: '' })
@@ -138,7 +139,7 @@ function App() {
 
   useEffect(() => {
     function reconnectAccount() {
-      fetch('/api/me', { credentials: 'same-origin' })
+      fetch(apiUrl('/me'), { credentials: 'same-origin' })
         .then(async (response) => {
           if (response.status === 401) {
             if (automaticSyncAttempted.current) automaticSyncAttempted.current = false
@@ -332,7 +333,7 @@ function App() {
         onSync={synchronizeWorkouts}
         onImport={() => fileInput.current?.click()}
       />}
-      {tab === 'account' && <AccountPage account={account} service={accountService} onAccountChange={updateAccount} />}
+      {tab === 'account' && <AccountPage account={account} onAccountChange={updateAccount} />}
       {tab === 'workout' && activeWorkout && <WorkoutEditor
         key={activeWorkout.id}
         workout={activeWorkout}
@@ -350,7 +351,7 @@ function App() {
   )
 }
 
-function AccountPage({ account, service, onAccountChange }) {
+function AccountPage({ account, onAccountChange }) {
   const [mode, setMode] = useState('login')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -363,7 +364,7 @@ function AccountPage({ account, service, onAccountChange }) {
     setMessage('')
     const form = new FormData(event.currentTarget)
     try {
-      const result = await accountRequest(`/api/auth/${mode === 'register' ? 'register' : 'login'}`, {
+      const result = await accountRequest(`/auth/${mode === 'register' ? 'register' : 'login'}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: form.get('email'), password: form.get('password') }),
@@ -382,7 +383,7 @@ function AccountPage({ account, service, onAccountChange }) {
     setError('')
     setMessage('')
     try {
-      await accountRequest('/api/auth/logout', { method: 'POST' })
+      await accountRequest('/auth/logout', { method: 'POST' })
       onAccountChange(null)
       setMessage('Vous êtes déconnecté. Vos données locales sont conservées sur cet appareil.')
     } catch (requestError) {
@@ -406,15 +407,13 @@ function AccountPage({ account, service, onAccountChange }) {
         <p className="eyebrow">CONNEXION FACULTATIVE</p>
         <h2>{mode === 'register' ? 'Créer un compte' : 'Accéder à votre compte'}</h2>
         <p>Un compte permet de vous identifier auprès du serveur. Vos données restent disponibles localement ; avec une session active, les séances se synchronisent automatiquement à l’ouverture lorsque le réseau et le serveur sont disponibles.</p>
-        {service.status === 'checking' && <p className="account-service-message">Vérification du service de compte…</p>}
-        {service.status === 'unavailable' && <p className="error" role="status">{service.message}</p>}
         <form className="account-form" onSubmit={submit}>
           <label>Adresse e-mail<input name="email" type="email" autoComplete="email" required maxLength="254" /></label>
           <label>Mot de passe<input name="password" type="password" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} required minLength={mode === 'register' ? 10 : undefined} /></label>
           {mode === 'register' && <small>10 caractères minimum.</small>}
           {error && <p className="error" role="alert">{error}</p>}
           {message && <p className="account-service-message" role="status">{message}</p>}
-          <button className="primary" type="submit" disabled={busy || service.status === 'unavailable'}>{busy ? 'Veuillez patienter…' : mode === 'register' ? 'Créer mon compte' : 'Se connecter'}</button>
+          <button className="primary" type="submit" disabled={busy}>{busy ? 'Veuillez patienter…' : mode === 'register' ? 'Créer mon compte' : 'Se connecter'}</button>
         </form>
         <button className="account-mode-button" type="button" onClick={() => { setMode(mode === 'register' ? 'login' : 'register'); setError(''); setMessage('') }}>
           {mode === 'register' ? 'J’ai déjà un compte' : 'Créer un compte'}
