@@ -178,34 +178,6 @@ npm run dev:frontend
 
 Le serveur Express démarre sur `http://localhost:3000` et Vite sur `http://localhost:5173`. Le proxy Vite transmet les appels `/api` à Express. Le parcours principal de l’interface reste néanmoins stocké dans IndexedDB, et non dans PostgreSQL.
 
-## Vérifications
-
-Depuis la racine du dépôt :
-
-```bash
-npm test
-npm run lint
-npm run build
-docker compose --env-file .env.example config -q
-```
-
-Les tests automatisés portent sur le moteur de génération, les règles de réalisation des séances, la validation des séances à synchroniser et l’import/export. Ils ne remplacent pas une démonstration de l’interface avec une autre personne.
-
-| Essai | Entrée | Résultat attendu |
-|---|---|---|
-| Parcours normal | Créer une séance de force avec une date et des quadriceps sélectionnés | Une séance datée, avec des exercices et le statut **Planifiée** |
-| Sélection vide | Renforcement général, date valide, aucun muscle choisi | Une séance générale peut quand même être créée |
-| Limite de profil | Masse corporelle de 300 kg, puis 301 kg | 300 kg est accepté ; 301 kg est refusé avec une erreur |
-| Date invalide | Date absente ou date impossible | La création est refusée et l’utilisateur reçoit une erreur |
-| Réalisation | Démarrer une séance, modifier les résultats réellement effectués, puis valider | Le programme initial reste conservé et les résultats apparaissent dans l’historique |
-| Synchronisation | Se connecter, ouvrir l’application, puis vérifier `GET /api/workouts/sync` | La synchronisation démarre automatiquement ; les séances apparaissent sur le compte |
-| Récupération sur un autre appareil | Se connecter au même compte dans un autre navigateur, puis ouvrir l’application | Les séances du compte apparaissent automatiquement dans le calendrier et l’historique |
-| Hors connexion / reprise | Créer ou modifier une séance sans réseau, puis rétablir le réseau | Les séances restent disponibles localement et la synchronisation reprend automatiquement |
-
-La suite comprend 30 tests automatisés couvrant le moteur de génération, le cycle de vie des séances, la synchronisation et l’import/export. Un test de bout en bout avec PostgreSQL isolé a vérifié la migration depuis l’ancien schéma, la création de compte, l’envoi et la récupération des séances, la mise à jour sans doublon, la résolution de modifications concurrentes et la protection d’une séance réalisée. Lors de la vérification manuelle finale, une séance locale a été envoyée automatiquement depuis un premier navigateur puis récupérée dans un second ; le service de santé a répondu normalement. Les pages principales ont été contrôlées à une largeur mobile de 390 px sans débordement horizontal. Les quatre commandes ci-dessus vérifient les tests, le lint, le build frontend et la configuration Docker Compose. Une démonstration du parcours à un autre utilisateur et l’évaluation par l’enseignant restent à effectuer.
-
-Pour la présentation, expliquer le besoin de Paul, réaliser le parcours principal, montrer comment le moteur propose les exercices, puis décrire où les données sont sauvegardées. Il est également utile de montrer une sauvegarde JSON et un test avec une entrée invalide.
-
 ## Limites connues
 
 - Les données du parcours React restent locales au navigateur par défaut. La synchronisation bidirectionnelle automatique nécessite une session de compte valide et le réseau ; elle peut être relancée depuis **Sauvegarde**.
