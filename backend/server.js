@@ -1,9 +1,11 @@
 import express from 'express'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { Pool } from 'pg'
 import { buildWorkout, objectives } from './planner.js'
+import { isWorkoutId, validateWorkoutForSync } from './workoutSync.js'
 import { EXERCISES } from '../frontend/src/data/exercises.js'
 
 const app = express()
@@ -54,12 +56,38 @@ app.post('/api/auth/logout', async (request, response) => { const token = cookie
 app.get('/api/me', auth, async (request, response) => { const result = await pool.query('SELECT first_name AS "firstName",body_mass AS "bodyMass",goals,muscles,equipment FROM profiles WHERE user_id=$1', [request.user.id]); response.json({ user: request.user, profile: result.rows[0] }) })
 app.put('/api/profile', auth, async (request, response) => { try { const p = profile(request.body); const result = await pool.query('UPDATE profiles SET first_name=$1,body_mass=$2,goals=$3,muscles=$4,equipment=$5,updated_at=NOW() WHERE user_id=$6 RETURNING first_name AS "firstName",body_mass AS "bodyMass",goals,muscles,equipment', [p.firstName,p.bodyMass,p.goals,p.muscles,p.equipment,request.user.id]); response.json(result.rows[0]) } catch (error) { response.status(400).json({ error: error.message }) } })
 app.get('/api/exercises', (request, response) => { const objective = String(request.query.objective || 'general'); if (!objectives[objective]) return response.status(400).json({ error: 'Objectif inconnu.' }); response.json(EXERCISES.filter((exercise) => exercise.objectives.includes(objective) && exercise.levels?.includes('avance')).map((exercise) => ({ id: exercise.id, name: exercise.name, description: exercise.description, muscles: exercise.muscles, objectives: exercise.objectives, equipment: exercise.equipment, instruction: exercise.instruction, errors: exercise.errors, precautions: exercise.precautions, easier: exercise.easier, harder: exercise.harder }))) })
+app.post('/api/workouts/:clientId/sync', auth, async (request, response) => {
+  if (!isWorkoutId(request.params.clientId)) return response.status(400).json({ error: 'Identifiant de séance invalide.' })
+  let workout
+  try {
+    workout = validateWorkoutForSync(request.body.workout, request.params.clientId, new Set(Object.keys(objectives)))
+  } catch (error) {
+    return response.status(400).json({ error: error.message })
+  }
+  const result = await pool.query(
+    `INSERT INTO workouts (user_id,client_workout_id,workout_data,title,objective,scheduled_for,status,completed_at)
+     VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,CASE WHEN $7::varchar='completed'::varchar THEN NOW() ELSE NULL END)
+     ON CONFLICT (user_id,client_workout_id) DO UPDATE
+     SET workout_data=EXCLUDED.workout_data,title=EXCLUDED.title,objective=EXCLUDED.objective,
+         scheduled_for=EXCLUDED.scheduled_for,status=EXCLUDED.status,
+         completed_at=CASE WHEN EXCLUDED.status='completed' THEN COALESCE(workouts.completed_at,NOW()) ELSE NULL END
+     WHERE workouts.status <> 'completed' OR EXCLUDED.status='completed'
+     RETURNING (xmax = 0) AS inserted`,
+    [request.user.id, workout.id, JSON.stringify(workout), workout.title.trim(), workout.objective, workout.scheduledFor, workout.status],
+  )
+  if (!result.rows[0]) return response.status(409).json({ error: 'Une version déjà réalisée de cette séance existe sur le compte. Elle n’a pas été remplacée.' })
+  response.json({ synchronized: true, inserted: result.rows[0].inserted })
+})
 app.post('/api/workouts', auth, async (request, response) => { const { objective = 'general', title = '', scheduledFor = null, muscles = [], bodyMass = null } = request.body; if (!objectives[objective] || typeof title !== 'string' || title.length > 100) return response.status(400).json({ error: 'Paramètres invalides.' }); const rows = await pool.query('SELECT id,name,instruction FROM exercises WHERE $1=ANY(objectives) ORDER BY id LIMIT 8', [objective]); let plan; try { plan = buildWorkout(rows.rows, { objective, title, scheduledFor, muscles, bodyMass }) } catch (error) { return response.status(400).json({ error: error.message }) } const client = await pool.connect(); try { await client.query('BEGIN'); const result = await client.query('INSERT INTO workouts (user_id,title,objective,scheduled_for) VALUES ($1,$2,$3,$4) RETURNING *', [request.user.id,plan.title,objective,plan.scheduledFor]); for (const item of plan.exercises) if (item.exerciseId != null) await client.query('INSERT INTO workout_exercises (workout_id,exercise_id,order_index,sets,reps,rest_seconds) VALUES ($1,$2,$3,$4,$5,$6)', [result.rows[0].id,item.exerciseId,item.orderIndex,item.sets,item.reps,item.restSeconds]); await client.query('COMMIT'); response.status(201).json({ ...plan, ...result.rows[0] }) } catch { await client.query('ROLLBACK'); response.status(500).json({ error: 'Séance non enregistrée.' }) } finally { client.release() } })
-app.get('/api/workouts', auth, async (request, response) => { const result = await pool.query('SELECT id,title,objective,scheduled_for AS "scheduledFor",status,completed_at AS "completedAt",notes FROM workouts WHERE user_id=$1 ORDER BY COALESCE(scheduled_for,created_at) DESC', [request.user.id]); response.json(result.rows) })
+app.get('/api/workouts', auth, async (request, response) => { const result = await pool.query('SELECT id,client_workout_id AS "clientWorkoutId",workout_data AS workout,title,objective,scheduled_for AS "scheduledFor",status,completed_at AS "completedAt",notes FROM workouts WHERE user_id=$1 ORDER BY COALESCE(scheduled_for,created_at) DESC', [request.user.id]); response.json(result.rows) })
 app.patch('/api/workouts/:id/status', auth, async (request, response) => { const status = request.body.status === 'completed' ? 'completed' : 'planned'; const result = await pool.query("UPDATE workouts SET status=$1,completed_at=CASE WHEN $1::varchar='completed'::varchar THEN NOW() ELSE NULL END WHERE id=$2 AND user_id=$3 RETURNING id,status,completed_at AS \"completedAt\"", [status,request.params.id,request.user.id]); if (!result.rows[0]) return response.status(404).json({ error: 'Séance introuvable.' }); response.json(result.rows[0]) })
 // Sert la racine pour les hébergeurs qui exposent le conteneur sur `/`,
 // tout en conservant le préfixe utilisé par le déploiement pédagogique.
 app.use(express.static(frontendDirectory))
 app.use(basePath, express.static(frontendDirectory))
 app.get(`${basePath}*splat`, (_request, response) => response.sendFile(path.join(frontendDirectory, 'index.html')))
+if (pool) {
+  const syncMigration = await readFile(path.join(root, '../database/migrations/002_workout_sync.sql'), 'utf8')
+  await pool.query(syncMigration)
+}
 app.listen(port, '0.0.0.0', () => console.log(`Muscle Training App listening on port ${port}`))

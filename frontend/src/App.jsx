@@ -7,6 +7,7 @@ import apexLogo from './assets/apex-logo.svg'
 import { generateWorkout, MIN_WORKOUT_EXERCISES, prescribeExercise, refreshWorkout } from './engine/workoutEngine'
 import { beginWorkout, completeWorkout, createRealization, snapshotWorkout } from './engine/workoutLifecycle'
 import { exportData, parseImport } from './storage/dataTransfer'
+import { syncLocalWorkouts } from './storage/accountSync'
 import { readAppData, writeAppData } from './storage/indexedDb'
 
 const emptyProfile = { firstName: '', bodyMass: '' }
@@ -101,6 +102,8 @@ function App() {
   const [notice, setNotice] = useState('')
   const [account, setAccount] = useState(null)
   const [accountService, setAccountService] = useState({ status: 'checking', message: '' })
+  const [syncing, setSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState('')
   const fileInput = useRef(null)
 
   useEffect(() => {
@@ -146,6 +149,23 @@ function App() {
   function updateAccount(user) {
     setAccount(user)
     setAccountService({ status: 'available', message: '' })
+  }
+  async function synchronizeWorkouts() {
+    setSyncing(true)
+    setSyncMessage('')
+    try {
+      const count = await syncLocalWorkouts(data.workouts)
+      setSyncMessage(count
+        ? `${count} séance${count > 1 ? 's' : ''} synchronisée${count > 1 ? 's' : ''} avec le compte.`
+        : 'Aucune séance locale à synchroniser.')
+    } catch (error) {
+      const synchronized = Number.isInteger(error.synchronized) ? error.synchronized : 0
+      setSyncMessage(synchronized
+        ? `${synchronized}/${data.workouts.length} séances synchronisées. Le reste n’a pas été envoyé : ${error.message}`
+        : `Synchronisation impossible : ${error.message}`)
+    } finally {
+      setSyncing(false)
+    }
   }
   function updateProfile(profile) { setData((current) => ({ ...current, profile })) }
   function addWorkout(workout) {
@@ -259,7 +279,15 @@ function App() {
       {tab === 'home' && <Home profile={data.profile} workouts={data.workouts} onProfileChange={updateProfile} onCreate={addWorkout} />}
       {tab === 'calendar' && <Calendar key={calendarFocusDate || 'current'} workouts={data.workouts} focusDate={calendarFocusDate} onOpen={openWorkout} onDelete={deleteWorkout} />}
       {tab === 'history' && <History workouts={data.workouts} onOpen={openWorkout} onDelete={deleteWorkout} />}
-      {tab === 'settings' && <Settings data={data} onImport={() => fileInput.current?.click()} />}
+      {tab === 'settings' && <Settings
+        data={data}
+        account={account}
+        accountService={accountService}
+        syncing={syncing}
+        syncMessage={syncMessage}
+        onSync={synchronizeWorkouts}
+        onImport={() => fileInput.current?.click()}
+      />}
       {tab === 'account' && <AccountPage account={account} service={accountService} onAccountChange={updateAccount} />}
       {tab === 'workout' && activeWorkout && <WorkoutEditor
         key={activeWorkout.id}
@@ -328,7 +356,7 @@ function AccountPage({ account, service, onAccountChange }) {
       {account ? <>
         <p className="eyebrow">SESSION ACTIVE</p>
         <h2>{account.email}</h2>
-        <p>Votre connexion au service de compte est ouverte. Le profil et les séances créés dans l’application restent enregistrés localement dans ce navigateur : ils ne sont pas transférés ni synchronisés avec ce compte.</p>
+        <p>Votre connexion au service de compte est ouverte. Le profil et les séances restent locaux par défaut. Depuis l’onglet Sauvegarde, vous pouvez envoyer une copie de vos séances vers ce compte.</p>
         <button className="secondary" type="button" disabled={busy} onClick={logout}>{busy ? 'Déconnexion…' : 'Se déconnecter'}</button>
       </> : <>
         <p className="eyebrow">CONNEXION FACULTATIVE</p>
@@ -629,10 +657,23 @@ function History({ workouts, onOpen, onDelete }) {
   </section>
 }
 
-function Settings({ data, onImport }) {
+function Settings({ data, account, accountService, syncing, syncMessage, onSync, onImport }) {
   return <section className="settings"><div className="section-heading"><div><p className="eyebrow">CONFIDENTIALITÉ & SAUVEGARDE</p><h1>Vos données restent à vous</h1></div></div>
     <section className="panel"><h2>Stockage local</h2><p>Vos données personnelles sont conservées dans IndexedDB sur cet appareil et ne sont pas envoyées au serveur. Exportez régulièrement une sauvegarde avant de changer d’appareil ou de nettoyer les données du navigateur.</p>
       <p className="note">{data.workouts.length} séances · sauvegarde au format JSON</p><div className="row-actions"><button className="primary small" onClick={() => exportData(data)}>Exporter mes données</button><button className="secondary" onClick={onImport}>Importer une sauvegarde</button></div>
+    </section>
+    <section className="panel account-sync-panel">
+      <p className="eyebrow">SAUVEGARDE DU COMPTE</p>
+      <h2>Synchroniser mes séances</h2>
+      <p>Envoyez une copie de vos séances locales vers votre compte. Votre calendrier et vos données locales restent prioritaires et continuent de fonctionner hors connexion.</p>
+      {account
+        ? <p className="account-sync-status">Connecté en tant que <strong>{account.email}</strong></p>
+        : <p className="note">{accountService.status === 'unavailable' ? accountService.message : 'Connectez-vous pour synchroniser une copie de vos séances sur votre compte.'}</p>}
+      <button className="secondary" type="button" disabled={!account || syncing || data.workouts.length === 0} onClick={onSync}>
+        {syncing ? 'Synchronisation…' : 'Synchroniser avec mon compte'}
+      </button>
+      {syncMessage && <p className={syncMessage.startsWith('Synchronisation impossible') || syncMessage.includes('n’a pas été envoyé') ? 'error' : 'account-sync-status'} role="status">{syncMessage}</p>}
+      <p className="note">Les séances déjà envoyées sont mises à jour sans créer de doublons. Cette action envoie les séances de cet appareil vers le compte ; elle ne récupère pas les données d’un autre appareil.</p>
     </section>
   </section>
 }

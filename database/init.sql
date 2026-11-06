@@ -49,11 +49,16 @@ ALTER TABLE exercises ADD COLUMN IF NOT EXISTS instruction TEXT NOT NULL DEFAULT
 
 CREATE TABLE IF NOT EXISTS workouts (
   id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  client_workout_id UUID,
+  workout_data JSONB,
   title VARCHAR(160) NOT NULL, objective VARCHAR(30) NOT NULL,
   scheduled_for DATE NOT NULL,
-  status VARCHAR(20) NOT NULL DEFAULT 'planned' CHECK (status IN ('generated', 'planned', 'started', 'completed')),
+  status VARCHAR(20) NOT NULL DEFAULT 'planned' CHECK (status IN ('generated', 'planned', 'started', 'completed', 'postponed', 'cancelled')),
   completed_at TIMESTAMPTZ, notes TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS workouts_user_client_workout_idx
+  ON workouts (user_id, client_workout_id);
 
 CREATE INDEX IF NOT EXISTS workouts_user_scheduled_idx ON workouts(user_id, scheduled_for);
 CREATE INDEX IF NOT EXISTS workouts_user_status_idx ON workouts(user_id, status);
