@@ -25,7 +25,7 @@ async function accountResult(response) {
   try {
     result = await response.json()
   } catch {
-    throw new Error('Le serveur a renvoyé une réponse illisible. Réessayez plus tard.')
+    throw new Error('Le service de compte est momentanément indisponible.')
   }
   if (!response.ok) throw new Error(result.error || 'La demande a échoué. Réessayez.')
   return result
