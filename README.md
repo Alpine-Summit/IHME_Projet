@@ -21,6 +21,7 @@ Par exemple, Paul est étudiant en STAPS et pratique le cyclisme. Il souhaite or
 5. Le jour de l’entraînement, ouvrir la séance et démarrer sa réalisation. Le programme prévu est alors conservé comme référence ; les résultats réellement effectués sont saisis séparément.
 6. Noter ses sensations et valider la séance explicitement. La séance réalisée est ensuite consultable dans l’**Historique**.
 7. Dans **Sauvegarde**, exporter ou importer un fichier JSON pour conserver ou transférer ses données.
+8. Facultativement, ouvrir **Se connecter** à côté d’**Exporter** pour créer un compte ou ouvrir une session.
 
 ## Ce que propose APEX
 
@@ -42,7 +43,11 @@ Effacer les données du navigateur peut supprimer cette copie locale. Exporter u
 
 ### Côté serveur
 
-Le projet comprend également une API Node.js/Express avec des routes de comptes et de séances, ainsi qu’une base PostgreSQL. **Cette API est distincte du parcours de l’interface React : l’application web ne propose pas de connexion utilisateur et ne synchronise pas ses séances locales avec l’API.** Les séances enregistrées depuis l’interface et celles enregistrées directement par les routes API ne constituent donc pas une seule sauvegarde partagée.
+Le bouton **Se connecter** permet de créer un compte ou d’ouvrir une session auprès de l’API Node.js/Express. L’inscription nécessite une adresse e-mail valide et un mot de passe d’au moins 10 caractères. Après connexion, le serveur conserve une session temporaire (8 heures) dans un cookie HTTP-only.
+
+La connexion est facultative et **ne change pas le mode local de l’application** : le profil et les séances de l’interface React restent enregistrés dans IndexedDB et ne sont ni transférés ni synchronisés avec ce compte. La déconnexion ferme la session serveur, sans effacer les données du navigateur. Les routes API peuvent associer les opérations qu’elles reçoivent directement au compte connecté, mais le parcours principal de l’interface ne les appelle pas pour enregistrer les séances.
+
+Le projet comprend également une API Node.js/Express avec des routes de comptes et de séances, ainsi qu’une base PostgreSQL. Les séances enregistrées depuis l’interface et celles enregistrées directement par les routes API ne constituent donc pas une seule sauvegarde partagée.
 
 En particulier, l’API PostgreSQL enregistre une programmation simplifiée. Elle ne conserve pas encore l’intégralité du programme verrouillé, les performances réelles détaillées pour chaque exercice ni le carnet de notes de l’interface.
 

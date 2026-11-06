@@ -19,6 +19,27 @@ const EXERCISE_GROUPS = [
   { title: 'Membres supérieurs', muscles: ['Pectoraux', 'Grand dorsal', 'Trapèzes', 'Rhomboïdes', 'Épaules', 'Biceps', 'Triceps', 'Avant-bras'] },
 ]
 
+async function accountResult(response) {
+  let result
+  try {
+    result = await response.json()
+  } catch {
+    throw new Error('Le serveur a renvoyé une réponse illisible. Réessayez plus tard.')
+  }
+  if (!response.ok) throw new Error(result.error || 'La demande a échoué. Réessayez.')
+  return result
+}
+
+async function accountRequest(path, options = {}) {
+  let response
+  try {
+    response = await fetch(path, { credentials: 'same-origin', ...options })
+  } catch {
+    throw new Error('Impossible de joindre le service de compte. Vérifiez la connexion au serveur.')
+  }
+  return accountResult(response)
+}
+
 function isValidDateKey(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const timestamp = Date.parse(`${value}T00:00:00.000Z`)
@@ -78,6 +99,8 @@ function App() {
   const [activeWorkoutId, setActiveWorkoutId] = useState(null)
   const [calendarFocusDate, setCalendarFocusDate] = useState(null)
   const [notice, setNotice] = useState('')
+  const [account, setAccount] = useState(null)
+  const [accountService, setAccountService] = useState({ status: 'checking', message: '' })
   const fileInput = useRef(null)
 
   useEffect(() => {
@@ -86,6 +109,26 @@ function App() {
       .then((stored) => { if (active) setData(normalizeData(stored)) })
       .catch((error) => { if (active) setNotice(`Impossible de lire la sauvegarde locale : ${error.message}`) })
       .finally(() => { if (active) setReady(true) })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    fetch('/api/me', { credentials: 'same-origin' })
+      .then(async (response) => {
+        if (response.status === 401) {
+          if (active) setAccountService({ status: 'available', message: '' })
+          return
+        }
+        const result = await accountResult(response)
+        if (active) {
+          setAccount(result.user)
+          setAccountService({ status: 'available', message: '' })
+        }
+      })
+      .catch((error) => {
+        if (active) setAccountService({ status: 'unavailable', message: `${error.message} Vous pouvez continuer à utiliser l’application et vos données locales.` })
+      })
     return () => { active = false }
   }, [])
 
@@ -100,6 +143,10 @@ function App() {
   }, [notice])
 
   const activeWorkout = data.workouts.find((workout) => workout.id === activeWorkoutId)
+  function updateAccount(user) {
+    setAccount(user)
+    setAccountService({ status: 'available', message: '' })
+  }
   function updateProfile(profile) { setData((current) => ({ ...current, profile })) }
   function addWorkout(workout) {
     setData((current) => ({ ...current, workouts: [workout, ...current.workouts] }))
@@ -204,6 +251,7 @@ function App() {
         </nav>
         <div className="data-actions">
           <button onClick={() => exportData(data)}>Exporter</button>
+          <button onClick={() => setTab('account')}>{account ? 'Mon compte' : 'Se connecter'}</button>
           <input ref={fileInput} type="file" accept="application/json" hidden onChange={importFile} />
         </div>
       </header>
@@ -212,6 +260,7 @@ function App() {
       {tab === 'calendar' && <Calendar key={calendarFocusDate || 'current'} workouts={data.workouts} focusDate={calendarFocusDate} onOpen={openWorkout} onDelete={deleteWorkout} />}
       {tab === 'history' && <History workouts={data.workouts} onOpen={openWorkout} onDelete={deleteWorkout} />}
       {tab === 'settings' && <Settings data={data} onImport={() => fileInput.current?.click()} />}
+      {tab === 'account' && <AccountPage account={account} service={accountService} onAccountChange={updateAccount} />}
       {tab === 'workout' && activeWorkout && <WorkoutEditor
         key={activeWorkout.id}
         workout={activeWorkout}
@@ -227,6 +276,80 @@ function App() {
       {tab === 'workout' && !activeWorkout && <Empty title="Séance introuvable" text="Retournez au calendrier pour choisir une séance." />}
     </main>
   )
+}
+
+function AccountPage({ account, service, onAccountChange }) {
+  const [mode, setMode] = useState('login')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+
+  async function submit(event) {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    setMessage('')
+    const form = new FormData(event.currentTarget)
+    try {
+      const result = await accountRequest(`/api/auth/${mode === 'register' ? 'register' : 'login'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.get('email'), password: form.get('password') }),
+      })
+      onAccountChange(result.user)
+      setMessage(mode === 'register' ? 'Compte créé et connexion ouverte.' : 'Connexion réussie.')
+    } catch (requestError) {
+      setError(requestError.message || 'Impossible de joindre le service de compte.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function logout() {
+    setBusy(true)
+    setError('')
+    setMessage('')
+    try {
+      await accountRequest('/api/auth/logout', { method: 'POST' })
+      onAccountChange(null)
+      setMessage('Vous êtes déconnecté. Vos données locales sont conservées sur cet appareil.')
+    } catch (requestError) {
+      setError(requestError.message || 'Impossible de joindre le service de compte.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <section className="account-page">
+    <div className="section-heading">
+      <div><p className="eyebrow">ESPACE PERSONNEL</p><h1>{account ? 'Votre compte' : 'Se connecter'}</h1><p className="muted">L’accès au compte est facultatif : vous pouvez utiliser l’application localement sans vous connecter.</p></div>
+    </div>
+    <div className="panel account-panel">
+      {account ? <>
+        <p className="eyebrow">SESSION ACTIVE</p>
+        <h2>{account.email}</h2>
+        <p>Votre connexion au service de compte est ouverte. Le profil et les séances créés dans l’application restent enregistrés localement dans ce navigateur : ils ne sont pas transférés ni synchronisés avec ce compte.</p>
+        <button className="secondary" type="button" disabled={busy} onClick={logout}>{busy ? 'Déconnexion…' : 'Se déconnecter'}</button>
+      </> : <>
+        <p className="eyebrow">CONNEXION FACULTATIVE</p>
+        <h2>{mode === 'register' ? 'Créer un compte' : 'Accéder à votre compte'}</h2>
+        <p>Un compte permet de vous identifier auprès du serveur. La connexion ne modifie pas vos données locales et ne les envoie pas vers PostgreSQL.</p>
+        {service.status === 'checking' && <p className="account-service-message">Vérification du service de compte…</p>}
+        {service.status === 'unavailable' && <p className="error" role="status">{service.message}</p>}
+        <form className="account-form" onSubmit={submit}>
+          <label>Adresse e-mail<input name="email" type="email" autoComplete="email" required maxLength="254" /></label>
+          <label>Mot de passe<input name="password" type="password" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} required minLength={mode === 'register' ? 10 : undefined} /></label>
+          {mode === 'register' && <small>10 caractères minimum.</small>}
+          {error && <p className="error" role="alert">{error}</p>}
+          {message && <p className="account-service-message" role="status">{message}</p>}
+          <button className="primary" type="submit" disabled={busy || service.status === 'unavailable'}>{busy ? 'Veuillez patienter…' : mode === 'register' ? 'Créer mon compte' : 'Se connecter'}</button>
+        </form>
+        <button className="account-mode-button" type="button" onClick={() => { setMode(mode === 'register' ? 'login' : 'register'); setError(''); setMessage('') }}>
+          {mode === 'register' ? 'J’ai déjà un compte' : 'Créer un compte'}
+        </button>
+      </>}
+    </div>
+  </section>
 }
 
 function Home({ profile, workouts, onProfileChange, onCreate }) {
