@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { Pool } from 'pg'
 import { buildWorkout, objectives } from './planner.js'
 import { isWorkoutId, validateWorkoutForSync } from './workoutSync.js'
+import { initializeDatabase } from './database.js'
 import { EXERCISES } from '../frontend/src/data/exercises.js'
 
 const app = express()
@@ -110,7 +111,10 @@ app.use(express.static(frontendDirectory))
 app.use(basePath, express.static(frontendDirectory))
 app.get(`${basePath}*splat`, (_request, response) => response.sendFile(path.join(frontendDirectory, 'index.html')))
 if (pool) {
-  const syncMigration = await readFile(path.join(root, '../database/migrations/002_workout_sync.sql'), 'utf8')
-  await pool.query(syncMigration)
+  const [initialSchema, syncMigration] = await Promise.all([
+    readFile(path.join(root, '../database/init.sql'), 'utf8'),
+    readFile(path.join(root, '../database/migrations/002_workout_sync.sql'), 'utf8'),
+  ])
+  await initializeDatabase(pool, initialSchema, syncMigration)
 }
 app.listen(port, '0.0.0.0', () => console.log(`Muscle Training App listening on port ${port}`))

@@ -178,6 +178,8 @@ npm run dev:frontend
 
 Le serveur Express démarre sur `http://localhost:3000` et Vite sur `http://localhost:5173`. Le proxy Vite transmet les appels `/api` à Express. Le parcours principal de l’interface reste néanmoins stocké dans IndexedDB, et non dans PostgreSQL.
 
+Au démarrage, le serveur initialise le schéma et les exercices de base si PostgreSQL est vide, puis applique la migration de synchronisation. Une base existante est conservée et reçoit uniquement la migration ; le schéma initial n’est pas rejoué sur les données présentes.
+
 ## Limites connues
 
 - Les données du parcours React restent locales au navigateur par défaut. La synchronisation bidirectionnelle automatique nécessite une session de compte valide et le réseau ; elle peut être relancée depuis **Sauvegarde**.
