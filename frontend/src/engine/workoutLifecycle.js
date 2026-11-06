@@ -42,6 +42,7 @@ export function beginWorkout(workout, now = new Date().toISOString()) {
     ...workout,
     status: 'started',
     startedAt: now,
+    updatedAt: now,
     plannedSnapshot,
     realization: createRealization(plannedSnapshot.exercises),
     notes: workout.notes || {},
@@ -50,5 +51,5 @@ export function beginWorkout(workout, now = new Date().toISOString()) {
 
 export function completeWorkout(workout, now = new Date().toISOString()) {
   if (workout.status !== 'started' || !workout.plannedSnapshot || !workout.realization) return workout
-  return { ...workout, status: 'completed', completedAt: now }
+  return { ...workout, status: 'completed', completedAt: now, updatedAt: now }
 }

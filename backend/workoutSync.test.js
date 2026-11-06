@@ -32,6 +32,7 @@ test('workout sync rejects mismatched or invalid client identifiers', () => {
 test('workout sync rejects invalid objective, status, date, and exercise count', () => {
   assert.throws(() => validateWorkoutForSync({ ...workout, objective: 'unknown' }, id, validObjectives), /Orientation/)
   assert.throws(() => validateWorkoutForSync({ ...workout, status: 'deleted' }, id, validObjectives), /Statut/)
+  assert.throws(() => validateWorkoutForSync({ ...workout, updatedAt: 'not-a-date' }, id, validObjectives), /modification/)
   assert.throws(() => validateWorkoutForSync({ ...workout, scheduledFor: '2026-02-31' }, id, validObjectives), /Date/)
   assert.throws(() => validateWorkoutForSync({ ...workout, exercises: [] }, id, validObjectives), /exercices/)
 })

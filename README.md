@@ -37,17 +37,19 @@ Par exemple, Paul est étudiant en STAPS et pratique le cyclisme. Il souhaite or
 
 ### Dans l’interface web
 
-Le parcours principal de l’application conserve le profil et les séances dans **IndexedDB**, une base de données du navigateur. Les données restent sur l’appareil et dans le navigateur utilisés : elles ne sont pas envoyées automatiquement vers PostgreSQL. Depuis **Sauvegarde**, après connexion, on peut déclencher manuellement l’envoi d’une copie des séances locales vers son compte. Le travail de création, de planification et de réalisation continue de fonctionner localement et hors connexion.
+Le parcours principal de l’application conserve le profil et les séances dans **IndexedDB**, une base de données du navigateur. Les données restent sur l’appareil et dans le navigateur utilisés : elles ne sont pas envoyées automatiquement vers PostgreSQL. Depuis **Sauvegarde**, après connexion et retour du réseau, on peut déclencher manuellement une synchronisation dans les deux sens. Le travail de création, de planification et de réalisation continue de fonctionner localement et hors connexion.
 
-La synchronisation est un envoi de sauvegarde, pas une fusion entre appareils : elle ne télécharge pas dans l’interface les séances déjà présentes sur le compte. Pour transférer ses données vers un autre navigateur, utiliser **Exporter** puis **Importer une sauvegarde**. Effacer les données du navigateur peut supprimer la copie locale ; exporter une sauvegarde avant de changer d’appareil ou de nettoyer les données du navigateur.
+La synchronisation est manuelle et bidirectionnelle : elle envoie les séances locales qui ne sont pas encore sur le compte et récupère celles qui y sont déjà enregistrées. Les séances sont fusionnées grâce à leur identifiant stable. Le profil reste local. Effacer les données du navigateur peut supprimer la copie locale ; le compte conserve les séances déjà synchronisées.
 
 ### Côté serveur
 
 Le bouton **Se connecter** permet de créer un compte ou d’ouvrir une session auprès de l’API Node.js/Express. L’inscription nécessite une adresse e-mail valide et un mot de passe d’au moins 10 caractères. Après connexion, le serveur conserve une session temporaire (8 heures) dans un cookie HTTP-only.
 
-La connexion est facultative et **ne change pas le mode local de l’application** : le profil reste dans IndexedDB. Depuis **Sauvegarde**, l’utilisateur peut envoyer manuellement les séances de cet appareil au compte. Le serveur en conserve une copie complète, comprenant le programme, les résultats réalisés et les notes. Une nouvelle synchronisation met à jour une séance portant le même identifiant au lieu d’en créer un doublon. Une séance déjà marquée comme réalisée sur le serveur n’est pas remplacée par une version antérieure non réalisée. La déconnexion ferme la session serveur, sans effacer ni la copie locale ni les séances déjà synchronisées.
+La connexion est facultative et **ne change pas le mode local de l’application** : le profil reste dans IndexedDB. Depuis **Sauvegarde**, l’utilisateur peut synchroniser manuellement dans les deux sens : envoyer les séances locales au compte et récupérer sur cet appareil les séances déjà synchronisées depuis un autre appareil. Le serveur conserve une copie complète, comprenant le programme, les résultats réalisés et les notes. Une nouvelle synchronisation met à jour une séance portant le même identifiant au lieu d’en créer un doublon.
 
-Le projet comprend également une API Node.js/Express avec des routes de comptes et de séances, ainsi qu’une base PostgreSQL. Les séances créées dans l’interface restent séparées des séances envoyées directement aux routes API, sauf lorsqu’on lance explicitement la synchronisation depuis **Sauvegarde**.
+Si une séance a été modifiée hors ligne sur plusieurs appareils, la version portant la date de modification la plus récente est retenue. Une séance déjà réalisée ne peut pas être remplacée par une version non réalisée. En cas d’interruption réseau, la synchronisation partielle est conservée et l’action peut être relancée. La déconnexion ferme la session serveur, sans effacer ni la copie locale ni les séances déjà synchronisées.
+
+Le projet comprend également une API Node.js/Express avec des routes de comptes et de séances, ainsi qu’une base PostgreSQL. Les séances créées dans l’interface sont envoyées au compte uniquement lorsqu’on lance explicitement la synchronisation depuis **Sauvegarde**.
 
 ## Technologies et organisation du projet
 
@@ -85,12 +87,13 @@ L’API est un service complémentaire du site. L’interface l’utilise pour l
 | `GET /api/me`, `PUT /api/profile` | Lire ou mettre à jour le profil associé au compte API |
 | `GET /api/exercises?objective=force` | Consulter les exercices correspondant à une orientation |
 | `POST /api/workouts`, `GET /api/workouts` | Générer, enregistrer ou lister des séances API |
+| `GET /api/workouts/sync` | Récupérer les séances déjà synchronisées du compte connecté |
 | `POST /api/workouts/:clientId/sync` | Sauvegarder ou mettre à jour une séance locale dans le compte connecté |
 | `PATCH /api/workouts/:id/status` | Modifier le statut d’une séance API |
 
 Lorsqu’une demande de création de séance arrive à l’API, le serveur vérifie l’orientation et le titre, demande au moteur de préparer une séance à partir des exercices enregistrés dans PostgreSQL, puis écrit la séance et ses exercices en base. La date de programmation est obligatoire. Une masse corporelle renseignée doit être comprise entre 20 et 300 kg. Les requêtes SQL utilisent des paramètres plutôt que d’insérer directement les valeurs dans le texte de la requête.
 
-Une séance créée hors connexion reste dans IndexedDB. Une fois la connexion internet rétablie et l’utilisateur connecté, le bouton **Synchroniser avec mon compte** envoie les séances une par une à `POST /api/workouts/:clientId/sync`. L’identifiant UUID de chaque séance rend les tentatives répétées idempotentes. Si le réseau tombe au milieu, l’interface indique combien de séances ont été envoyées et l’utilisateur peut relancer l’action ; les séances déjà reçues sont reconnues et mises à jour sans doublon.
+Une séance créée hors connexion reste dans IndexedDB. Une fois la connexion internet rétablie et l’utilisateur connecté, le bouton **Synchroniser avec mon compte** récupère d’abord les séances du compte via `GET /api/workouts/sync`, les fusionne avec les séances locales, puis envoie les séances locales plus récentes à `POST /api/workouts/:clientId/sync`. L’identifiant UUID de chaque séance rend les tentatives répétées idempotentes. En cas de modifications divergentes, la date de mise à jour départage les versions, sans jamais remplacer une séance réalisée par une séance non réalisée. Si le réseau tombe au milieu, l’interface indique combien de séances ont été envoyées ou récupérées et l’utilisateur peut relancer l’action.
 
 ## Modèle de données PostgreSQL
 
@@ -102,7 +105,7 @@ Le schéma est défini dans [`database/init.sql`](./database/init.sql).
 | `sessions` | `id` ; `user_id` référence `users.id` | Sessions de connexion de l’API |
 | `profiles` | `user_id` référence `users.id` | Profil associé à un compte API |
 | `exercises` | `id` ; nom unique | Catalogue d’exercices du backend |
-| `workouts` | `id` ; `user_id` référence `users.id` ; `(user_id, client_workout_id)` unique | Séances API et copies JSONB complètes des séances synchronisées |
+| `workouts` | `id` ; `user_id` référence `users.id` ; `(user_id, client_workout_id)` unique | Séances API, version complète JSONB et date de mise à jour pour synchronisation |
 | `workout_exercises` | Clé composée `(workout_id, order_index)` | Exercices ordonnés d’une séance API |
 
 Une séance peut contenir plusieurs exercices, et un exercice peut être utilisé dans plusieurs séances. La table `workout_exercises` enregistre cette association et l’ordre des exercices. Les champs prévus par le schéma utilisent notamment les kilogrammes pour la masse corporelle et les secondes pour la récupération.
@@ -195,17 +198,18 @@ Les tests automatisés portent sur le moteur de génération, les règles de ré
 | Limite de profil | Masse corporelle de 300 kg, puis 301 kg | 300 kg est accepté ; 301 kg est refusé avec une erreur |
 | Date invalide | Date absente ou date impossible | La création est refusée et l’utilisateur reçoit une erreur |
 | Réalisation | Démarrer une séance, modifier les résultats réellement effectués, puis valider | Le programme initial reste conservé et les résultats apparaissent dans l’historique |
-| Synchronisation | Se connecter, synchroniser deux fois une séance locale, puis vérifier `GET /api/workouts` | Une seule copie existe sur le compte et contient programme, réalisation et notes |
-| Hors connexion / reprise | Créer des séances sans réseau, se reconnecter, puis synchroniser | Les séances restent disponibles localement et sont envoyées à la reprise du réseau |
+| Synchronisation | Se connecter, synchroniser deux fois une séance locale, puis vérifier `GET /api/workouts/sync` | Une seule copie existe sur le compte et contient programme, réalisation et notes |
+| Récupération sur un autre appareil | Se connecter au même compte sur un navigateur vierge, puis synchroniser | Les séances du compte apparaissent dans le calendrier et l’historique locaux |
+| Hors connexion / reprise | Créer ou modifier une séance sans réseau, se reconnecter, puis synchroniser | Les séances restent disponibles localement ; les changements se réconcilient à la synchronisation |
 
-Au dernier contrôle, les 27 tests automatisés passent, ESLint et le build de production réussissent, et la configuration Docker Compose est valide. Un test de bout en bout avec une instance PostgreSQL Docker isolée a vérifié l’inscription, l’envoi d’une séance, la mise à jour sans doublon, la conservation de la réalisation complète, le refus d’une ancienne version non réalisée et la relecture du contenu synchronisé. La démonstration complète de l’interface à un autre utilisateur et l’évaluation par l’enseignant restent à effectuer.
+Au dernier contrôle, les 29 tests automatisés passent, ESLint et le build de production réussissent, et la configuration Docker Compose est valide. Un test de bout en bout avec une instance PostgreSQL Docker isolée a vérifié la migration depuis l’ancien schéma, l’inscription, l’envoi et la récupération d’une séance depuis deux sessions de compte, la mise à jour sans doublon, la résolution d’une modification concurrente et la protection d’une séance réalisée avec ses résultats et ses notes. La démonstration complète de l’interface à un autre utilisateur et l’évaluation par l’enseignant restent à effectuer.
 
 Pour la présentation, expliquer le besoin de Paul, réaliser le parcours principal, montrer comment le moteur propose les exercices, puis décrire où les données sont sauvegardées. Il est également utile de montrer une sauvegarde JSON et un test avec une entrée invalide.
 
 ## Limites connues
 
-- Les données du parcours React restent locales au navigateur par défaut. La synchronisation vers le compte est manuelle et envoie les séances de cet appareil vers le serveur.
-- La synchronisation ne télécharge pas les données du compte dans un autre navigateur et ne fusionne pas plusieurs appareils ; utiliser Exporter/Importer pour transférer une sauvegarde.
+- Les données du parcours React restent locales au navigateur par défaut. La synchronisation bidirectionnelle est manuelle et nécessite une connexion au compte et au réseau.
+- En cas de modifications concurrentes hors ligne, la version avec la date de modification la plus récente est retenue ; une séance réalisée reste protégée contre une version non réalisée.
 - Le profil utilisateur de l’interface n’est pas synchronisé avec le compte.
 - Aucune instance publique de production n’est actuellement configurée. Le workflow GitHub Actions peut construire et publier une image ; le déploiement vers un hébergeur nécessite une configuration supplémentaire.
 Les charges proposées ne constituent pas un avis médical. Interrompre un mouvement en cas de douleur et adapter la séance à sa situation.

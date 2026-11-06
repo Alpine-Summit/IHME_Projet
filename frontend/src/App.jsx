@@ -7,7 +7,7 @@ import apexLogo from './assets/apex-logo.svg'
 import { generateWorkout, MIN_WORKOUT_EXERCISES, prescribeExercise, refreshWorkout } from './engine/workoutEngine'
 import { beginWorkout, completeWorkout, createRealization, snapshotWorkout } from './engine/workoutLifecycle'
 import { exportData, parseImport } from './storage/dataTransfer'
-import { syncLocalWorkouts } from './storage/accountSync'
+import { mergeWorkoutLists, syncLocalWorkouts } from './storage/accountSync'
 import { readAppData, writeAppData } from './storage/indexedDb'
 
 const emptyProfile = { firstName: '', bodyMass: '' }
@@ -154,15 +154,20 @@ function App() {
     setSyncing(true)
     setSyncMessage('')
     try {
-      const count = await syncLocalWorkouts(data.workouts)
-      setSyncMessage(count
-        ? `${count} séance${count > 1 ? 's' : ''} synchronisée${count > 1 ? 's' : ''} avec le compte.`
-        : 'Aucune séance locale à synchroniser.')
+      const result = await syncLocalWorkouts(data.workouts)
+      setData((current) => ({ ...current, workouts: mergeWorkoutLists(current.workouts, result.workouts) }))
+      const parts = []
+      if (result.uploaded) parts.push(`${result.uploaded} envoyée${result.uploaded > 1 ? 's' : ''}`)
+      if (result.downloaded) parts.push(`${result.downloaded} récupérée${result.downloaded > 1 ? 's' : ''}`)
+      setSyncMessage(parts.length ? `Synchronisation terminée : ${parts.join(', ')}.` : 'Tout est déjà synchronisé.')
     } catch (error) {
-      const synchronized = Number.isInteger(error.synchronized) ? error.synchronized : 0
-      setSyncMessage(synchronized
-        ? `${synchronized}/${data.workouts.length} séances synchronisées. Le reste n’a pas été envoyé : ${error.message}`
-        : `Synchronisation impossible : ${error.message}`)
+      if (Array.isArray(error.workouts)) {
+        setData((current) => ({ ...current, workouts: mergeWorkoutLists(current.workouts, error.workouts) }))
+      }
+      const progress = []
+      if (error.uploaded) progress.push(`${error.uploaded} envoyée${error.uploaded > 1 ? 's' : ''}`)
+      if (error.downloaded) progress.push(`${error.downloaded} récupérée${error.downloaded > 1 ? 's' : ''}`)
+      setSyncMessage(`${progress.length ? `${progress.join(', ')}. ` : ''}Synchronisation incomplète : ${error.message}`)
     } finally {
       setSyncing(false)
     }
@@ -665,15 +670,15 @@ function Settings({ data, account, accountService, syncing, syncMessage, onSync,
     <section className="panel account-sync-panel">
       <p className="eyebrow">SAUVEGARDE DU COMPTE</p>
       <h2>Synchroniser mes séances</h2>
-      <p>Envoyez une copie de vos séances locales vers votre compte. Votre calendrier et vos données locales restent prioritaires et continuent de fonctionner hors connexion.</p>
+      <p>Envoyez les séances locales vers votre compte et récupérez celles déjà enregistrées depuis vos autres appareils. Votre calendrier reste disponible hors connexion.</p>
       {account
         ? <p className="account-sync-status">Connecté en tant que <strong>{account.email}</strong></p>
         : <p className="note">{accountService.status === 'unavailable' ? accountService.message : 'Connectez-vous pour synchroniser une copie de vos séances sur votre compte.'}</p>}
       <button className="secondary" type="button" disabled={!account || syncing || data.workouts.length === 0} onClick={onSync}>
         {syncing ? 'Synchronisation…' : 'Synchroniser avec mon compte'}
       </button>
-      {syncMessage && <p className={syncMessage.startsWith('Synchronisation impossible') || syncMessage.includes('n’a pas été envoyé') ? 'error' : 'account-sync-status'} role="status">{syncMessage}</p>}
-      <p className="note">Les séances déjà envoyées sont mises à jour sans créer de doublons. Cette action envoie les séances de cet appareil vers le compte ; elle ne récupère pas les données d’un autre appareil.</p>
+      {syncMessage && <p className={syncMessage.startsWith('Synchronisation incomplète') ? 'error' : 'account-sync-status'} role="status">{syncMessage}</p>}
+      <p className="note">En cas de modification sur deux appareils, la version la plus récente est conservée. Une séance déjà réalisée ne peut pas être remplacée par une version non réalisée. Les données locales restent prioritaires hors connexion ; synchronisez après vous être connecté pour récupérer les changements.</p>
     </section>
   </section>
 }

@@ -64,19 +64,42 @@ app.post('/api/workouts/:clientId/sync', auth, async (request, response) => {
   } catch (error) {
     return response.status(400).json({ error: error.message })
   }
+  const updatedAt = new Date(workout.updatedAt || workout.createdAt || Date.now())
   const result = await pool.query(
-    `INSERT INTO workouts (user_id,client_workout_id,workout_data,title,objective,scheduled_for,status,completed_at)
-     VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,CASE WHEN $7::varchar='completed'::varchar THEN NOW() ELSE NULL END)
+    `INSERT INTO workouts (user_id,client_workout_id,workout_data,title,objective,scheduled_for,status,completed_at,updated_at)
+     VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,CASE WHEN $7::varchar='completed'::varchar THEN NOW() ELSE NULL END,$8)
      ON CONFLICT (user_id,client_workout_id) DO UPDATE
      SET workout_data=EXCLUDED.workout_data,title=EXCLUDED.title,objective=EXCLUDED.objective,
          scheduled_for=EXCLUDED.scheduled_for,status=EXCLUDED.status,
-         completed_at=CASE WHEN EXCLUDED.status='completed' THEN COALESCE(workouts.completed_at,NOW()) ELSE NULL END
-     WHERE workouts.status <> 'completed' OR EXCLUDED.status='completed'
+         completed_at=CASE WHEN EXCLUDED.status='completed' THEN COALESCE(workouts.completed_at,NOW()) ELSE NULL END,
+         updated_at=GREATEST(workouts.updated_at,EXCLUDED.updated_at)
+     WHERE (EXCLUDED.updated_at > workouts.updated_at
+            OR (EXCLUDED.status='completed' AND workouts.status <> 'completed'))
+       AND (workouts.status <> 'completed' OR EXCLUDED.status='completed')
      RETURNING (xmax = 0) AS inserted`,
-    [request.user.id, workout.id, JSON.stringify(workout), workout.title.trim(), workout.objective, workout.scheduledFor, workout.status],
+    [request.user.id, workout.id, JSON.stringify(workout), workout.title.trim(), workout.objective, workout.scheduledFor, workout.status, updatedAt],
   )
-  if (!result.rows[0]) return response.status(409).json({ error: 'Une version déjà réalisée de cette séance existe sur le compte. Elle n’a pas été remplacée.' })
+  if (!result.rows[0]) {
+    const existing = await pool.query(
+      'SELECT workout_data AS workout,updated_at AS "updatedAt" FROM workouts WHERE user_id=$1 AND client_workout_id=$2',
+      [request.user.id, workout.id],
+    )
+    if (!existing.rows[0]?.workout) return response.status(404).json({ error: 'Séance du compte introuvable.' })
+    return response.status(409).json({
+      error: 'Une version plus récente ou déjà réalisée existe sur le compte.',
+      workout: { ...existing.rows[0].workout, updatedAt: existing.rows[0].updatedAt },
+    })
+  }
   response.json({ synchronized: true, inserted: result.rows[0].inserted })
+})
+app.get('/api/workouts/sync', auth, async (request, response) => {
+  const result = await pool.query(
+    `SELECT workout_data AS workout,updated_at AS "updatedAt"
+     FROM workouts WHERE user_id=$1 AND client_workout_id IS NOT NULL AND workout_data IS NOT NULL
+     ORDER BY scheduled_for,created_at`,
+    [request.user.id],
+  )
+  response.json(result.rows.map((row) => ({ ...row.workout, updatedAt: row.updatedAt })))
 })
 app.post('/api/workouts', auth, async (request, response) => { const { objective = 'general', title = '', scheduledFor = null, muscles = [], bodyMass = null } = request.body; if (!objectives[objective] || typeof title !== 'string' || title.length > 100) return response.status(400).json({ error: 'Paramètres invalides.' }); const rows = await pool.query('SELECT id,name,instruction FROM exercises WHERE $1=ANY(objectives) ORDER BY id LIMIT 8', [objective]); let plan; try { plan = buildWorkout(rows.rows, { objective, title, scheduledFor, muscles, bodyMass }) } catch (error) { return response.status(400).json({ error: error.message }) } const client = await pool.connect(); try { await client.query('BEGIN'); const result = await client.query('INSERT INTO workouts (user_id,title,objective,scheduled_for) VALUES ($1,$2,$3,$4) RETURNING *', [request.user.id,plan.title,objective,plan.scheduledFor]); for (const item of plan.exercises) if (item.exerciseId != null) await client.query('INSERT INTO workout_exercises (workout_id,exercise_id,order_index,sets,reps,rest_seconds) VALUES ($1,$2,$3,$4,$5,$6)', [result.rows[0].id,item.exerciseId,item.orderIndex,item.sets,item.reps,item.restSeconds]); await client.query('COMMIT'); response.status(201).json({ ...plan, ...result.rows[0] }) } catch { await client.query('ROLLBACK'); response.status(500).json({ error: 'Séance non enregistrée.' }) } finally { client.release() } })
 app.get('/api/workouts', auth, async (request, response) => { const result = await pool.query('SELECT id,client_workout_id AS "clientWorkoutId",workout_data AS workout,title,objective,scheduled_for AS "scheduledFor",status,completed_at AS "completedAt",notes FROM workouts WHERE user_id=$1 ORDER BY COALESCE(scheduled_for,created_at) DESC', [request.user.id]); response.json(result.rows) })

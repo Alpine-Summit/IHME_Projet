@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS workouts (
   title VARCHAR(160) NOT NULL, objective VARCHAR(30) NOT NULL,
   scheduled_for DATE NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'planned' CHECK (status IN ('generated', 'planned', 'started', 'completed', 'postponed', 'cancelled')),
-  completed_at TIMESTAMPTZ, notes TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  completed_at TIMESTAMPTZ, notes TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS workouts_user_client_workout_idx

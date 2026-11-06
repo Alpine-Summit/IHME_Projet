@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 ALTER TABLE workouts
   ADD COLUMN IF NOT EXISTS client_workout_id UUID,
-  ADD COLUMN IF NOT EXISTS workout_data JSONB;
+  ADD COLUMN IF NOT EXISTS workout_data JSONB,
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 CREATE UNIQUE INDEX IF NOT EXISTS workouts_user_client_workout_idx
   ON workouts (user_id, client_workout_id);

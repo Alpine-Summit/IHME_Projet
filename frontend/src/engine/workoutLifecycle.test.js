@@ -15,6 +15,7 @@ const planned = {
 test('starting a workout freezes a copied plan and creates independent actual values', () => {
   const started = beginWorkout(planned, '2026-11-06T09:00:00.000Z')
   assert.equal(started.status, 'started')
+  assert.equal(started.updatedAt, '2026-11-06T09:00:00.000Z')
   assert.notEqual(started.plannedSnapshot.exercises[0], started.exercises[0])
   assert.deepEqual(started.realization.exercises[0], {
     exerciseId: 'squat', sets: '', reps: '', restSeconds: '', load: '', skipped: false, legacyResult: '',
@@ -38,6 +39,7 @@ test('only an in-progress workout can be completed and completion preserves both
   }, '2026-11-06T10:00:00.000Z')
 
   assert.equal(completed.status, 'completed')
+  assert.equal(completed.updatedAt, '2026-11-06T10:00:00.000Z')
   assert.equal(completed.plannedSnapshot.exercises[0].sets, 3)
   assert.equal(completed.realization.exercises[0].reps, '8 / 8 / 7')
   assert.equal(completeWorkout(planned), planned)

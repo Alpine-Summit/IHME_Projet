@@ -21,6 +21,12 @@ export function validateWorkoutForSync(workout, clientId, validObjectives) {
   if (!WORKOUT_STATUSES.has(workout.status)) {
     throw new Error('Statut de séance invalide.')
   }
+  const updatedAt = workout.updatedAt || workout.createdAt
+    ? Date.parse(workout.updatedAt || workout.createdAt)
+    : Date.now()
+  if (!Number.isFinite(updatedAt) || updatedAt > Date.now() + 5 * 60 * 1000) {
+    throw new Error('Date de modification de la séance invalide.')
+  }
   if (!isValidDate(workout.scheduledFor)) {
     throw new Error('Date de planification invalide.')
   }
