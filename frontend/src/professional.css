@@ -14,10 +14,36 @@
 
 body {
   min-width: 320px;
-  background:
-    radial-gradient(ellipse at 85% 4%, #dce8df 0, transparent 34rem),
-    linear-gradient(180deg, #f3f5ef 0, var(--bg) 42rem, #e9efea 100%);
+  background: #e7ece8;
   color: var(--ink);
+}
+
+.app {
+  position: relative;
+  isolation: isolate;
+}
+.app::before {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  background-position: center;
+  background-size: cover;
+  content: '';
+}
+.app.page-home::before {
+  background-image: linear-gradient(115deg, rgba(240, 244, 238, .88), rgba(233, 239, 234, .72)), url('./assets/performance-home.jpg');
+}
+.app.page-calendar::before {
+  background-image: linear-gradient(115deg, rgba(239, 244, 240, .88), rgba(231, 238, 235, .72)), url('./assets/performance-calendar.jpg');
+}
+.app.page-workout::before {
+  background-image: linear-gradient(115deg, rgba(241, 242, 235, .9), rgba(235, 239, 231, .76)), url('./assets/performance-workout.jpg');
+}
+.app.page-history::before {
+  background-image: linear-gradient(115deg, rgba(239, 244, 241, .88), rgba(232, 239, 239, .72)), url('./assets/performance-history.jpg');
+}
+.app.page-settings::before {
+  background-image: linear-gradient(115deg, rgba(241, 243, 236, .89), rgba(235, 239, 232, .73)), url('./assets/performance-settings.jpg');
 }
 
 button, input, select, textarea { font: inherit; }
@@ -42,12 +68,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   border: 1px solid #29483d;
   border-radius: 24px;
   background-image:
-    linear-gradient(94deg, rgba(14, 33, 30, .98) 0%, rgba(18, 45, 37, .88) 50%, rgba(18, 45, 37, .57) 100%),
-    url('./assets/apex-hero.svg');
+    linear-gradient(94deg, rgba(14, 33, 30, .92) 0%, rgba(18, 45, 37, .70) 48%, rgba(18, 45, 37, .30) 100%),
+    url('./assets/performance-hero.jpg');
   background-position: center;
   background-size: cover;
   box-shadow: 0 26px 65px #182c2426;
 }
+.welcome::after { content: none; }
 .welcome h1 { max-width: 780px; font-size: clamp(40px, 5.3vw, 72px); letter-spacing: -.055em; }
 .welcome .muted { max-width: 620px; font-size: 17px; }
 .welcome .eyebrow { color: #e2bd78; }

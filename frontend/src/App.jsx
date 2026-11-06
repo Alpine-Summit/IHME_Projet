@@ -93,6 +93,12 @@ function App() {
     if (ready) writeAppData(data).catch((error) => setNotice(`La sauvegarde locale a échoué : ${error.message}`))
   }, [data, ready])
 
+  useEffect(() => {
+    if (!notice) return undefined
+    const timeout = window.setTimeout(() => setNotice(''), 4800)
+    return () => window.clearTimeout(timeout)
+  }, [notice])
+
   const activeWorkout = data.workouts.find((workout) => workout.id === activeWorkoutId)
   function updateProfile(profile) { setData((current) => ({ ...current, profile })) }
   function addWorkout(workout) {
@@ -188,7 +194,7 @@ function App() {
 
   if (!ready) return <main className="app loading"><img className="apex-logo" src={apexLogo} alt="APEX Performance" /><p>Préparation de votre espace de performance…</p></main>
   return (
-    <main className="app">
+    <main className={`app page-${tab}`}>
       <header className="topbar">
         <button className="brand brand-button" aria-label="APEX — accueil" onClick={() => setTab('home')}>
           <img className="apex-logo" src={apexLogo} alt="APEX Performance" />
@@ -230,7 +236,7 @@ function Home({ profile, workouts, onProfileChange, onCreate }) {
       <div className="welcome-copy">
         <p className="eyebrow">APEX PERFORMANCE · ENDURANCE STRENGTH</p>
         {profile.firstName && <p className="hero-greeting">Bonjour, {profile.firstName}</p>}
-        <h1>La force au service de votre endurance.</h1>
+        <h1>La force au service de votre endurance</h1>
         <p className="muted">Planifiez vos séances de renforcement, suivez chaque réalisation et construisez une préparation cohérente au fil de votre saison.</p>
         <div className="hero-points"><span>Programme structuré</span><span>Historique de réalisation</span><span>Données privées sur cet appareil</span></div>
       </div>
@@ -245,7 +251,7 @@ function Profile({ profile, onChange }) {
   return <section className="panel profile profile-compact">
     <div className="panel-heading"><div><p className="eyebrow">VOTRE PROFIL</p><h2>Personnaliser les repères</h2><p className="muted">La masse corporelle ajuste les suggestions de charge indicatives. Toutes les valeurs restent modifiables.</p></div><span className="badge">Enregistré sur cet appareil</span></div>
     <div className="profile-fields">
-      <label className="weight-field">Prénom <span>(facultatif)</span><input type="text" autoComplete="given-name" maxLength="40" placeholder="Ex. Alex" value={profile.firstName} onChange={(event) => onChange({ ...profile, firstName: event.target.value })} /></label>
+      <label className="weight-field">Prénom <span>(facultatif)</span><input type="text" autoComplete="given-name" maxLength="40" placeholder="Ex. Paul" value={profile.firstName} onChange={(event) => onChange({ ...profile, firstName: event.target.value })} /></label>
       <label className="weight-field">Masse corporelle <span>(facultative)</span><div className="input-suffix"><input type="number" min="20" max="300" step="0.1" placeholder="Ex. 72" value={profile.bodyMass} onChange={(event) => onChange({ ...profile, bodyMass: event.target.value })} /><b>kg</b></div><small>Les charges proposées restent indicatives et modifiables.</small></label>
     </div>
   </section>

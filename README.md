@@ -29,7 +29,7 @@ frontend/                     Interface React construite avec Vite
   src/App.jsx                 Navigation, planification et vues de séance
   src/engine/                 Génération et cycle de vie des séances
   src/storage/                IndexedDB, sauvegarde et import/export
-  src/assets/                 Identité visuelle et illustrations
+  src/assets/                 Identité visuelle, photos sportives et illustrations
 backend/                      Serveur Node.js / Express
   planner.js                  Adaptateur vers le moteur de génération
   server.js                   API et service de l’application
@@ -38,6 +38,7 @@ docker-compose.yml             Services de l’application et de PostgreSQL
 ```
 
 Le serveur Express et PostgreSQL sont disponibles pour le déploiement et l’évolution des services. L’application web utilise actuellement le stockage local du navigateur pour son parcours de planification.
+Les photographies de performance utilisées en arrière-plan sont intégrées localement aux ressources du frontend (Unsplash).
 
 ## Prérequis
 
