@@ -180,7 +180,7 @@ Le serveur Express démarre sur `http://localhost:3000` et Vite sur `http://loca
 
 Lorsqu’elle est publiée sous un sous-chemin, la valeur `BASE_PATH` (par exemple `/p18/`) est utilisée à la fois pour les fichiers de l’interface et les routes de l’API.
 
-Au démarrage, le serveur initialise le schéma et les exercices de base si PostgreSQL est vide, puis applique la migration de synchronisation. Une base existante est conservée et reçoit uniquement la migration ; le schéma initial n’est pas rejoué sur les données présentes.
+Au démarrage, le serveur vérifie la présence des tables nécessaires à APEX. Il initialise le schéma et les exercices de base si elles sont absentes, même si PostgreSQL contient d’autres tables, puis applique la migration de synchronisation. Un schéma APEX complet est conservé et reçoit uniquement la migration.
 
 ## Limites connues
 
