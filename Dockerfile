@@ -1,8 +1,8 @@
 FROM node:24-bookworm-slim AS build
 
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY frontend/package*.json ./frontend/
 RUN cd frontend && npm ci
 COPY frontend ./frontend
@@ -18,8 +18,8 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV BASE_PATH=${BASE_PATH}
 WORKDIR /app
-COPY package.json ./
-RUN npm install --omit=dev && npm cache clean --force
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 COPY --chown=node:node backend ./backend
 COPY --chown=node:node frontend/src ./frontend/src
 COPY --from=build --chown=node:node /app/frontend/dist ./frontend/dist

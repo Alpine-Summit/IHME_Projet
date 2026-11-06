@@ -1,16 +1,14 @@
-# React + Vite
+# Frontend APEX Performance
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+L’application React/Vite, ses consignes d’installation, son scénario de démonstration, son modèle de données et les vérifications du projet sont documentés dans le [README à la racine](../README.md).
 
-Currently, two official plugins are available:
+Depuis la racine du dépôt :
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm ci --prefix frontend
+npm run dev:frontend
+npm run lint
+npm run build
+```
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Le serveur de développement Vite démarre sur `http://localhost:5173`. Pour les routes API proxifiées et le lancement complet avec PostgreSQL, suivre les instructions Docker du README principal.
