@@ -55,6 +55,17 @@ test('syncLocalWorkouts handles an empty local collection', async () => {
   assert.deepEqual(result, { workouts: [], uploaded: 0, downloaded: 0 })
 })
 
+test('syncLocalWorkouts exposes an expired session so the app can request sign-in', async () => {
+  await assert.rejects(
+    syncLocalWorkouts([], async () => ({
+      status: 401,
+      ok: false,
+      json: async () => ({ error: 'Connexion requise.' }),
+    })),
+    (error) => error.status === 401 && error.message === 'Connexion requise.',
+  )
+})
+
 test('mergeWorkoutLists downloads remote-only sessions and preserves the newer version', async () => {
   const local = { id: 'same', title: 'Local newer', status: 'planned', scheduledFor: '2026-11-06', updatedAt: '2026-11-06T12:00:00Z' }
   const remote = { id: 'same', title: 'Remote older', status: 'planned', scheduledFor: '2026-11-06', updatedAt: '2026-11-06T10:00:00Z' }

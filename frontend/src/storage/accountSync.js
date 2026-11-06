@@ -57,12 +57,13 @@ export async function syncLocalWorkouts(localWorkouts, request = fetch) {
   let uploaded = 0
   let state = { workouts: [...localWorkouts], downloaded: 0 }
 
-  function fail(message, cause) {
+  function fail(message, cause, status) {
     const error = new Error(message)
     error.workouts = state.workouts
     error.uploaded = uploaded
     error.downloaded = state.downloaded
     if (cause) error.cause = cause
+    if (status) error.status = status
     throw error
   }
 
@@ -73,7 +74,7 @@ export async function syncLocalWorkouts(localWorkouts, request = fetch) {
     fail('Connexion au serveur interrompue.', error)
   }
   const remoteWorkouts = await readJson(response).catch((error) => fail(error.message, error))
-  if (!response.ok) fail(remoteWorkouts.error || 'Impossible de récupérer les séances du compte.')
+  if (!response.ok) fail(remoteWorkouts.error || 'Impossible de récupérer les séances du compte.', undefined, response.status)
   if (!Array.isArray(remoteWorkouts) || remoteWorkouts.some((workout) => !workout || typeof workout.id !== 'string')) {
     fail('Le compte a renvoyé une liste de séances invalide.')
   }
@@ -103,7 +104,7 @@ export async function syncLocalWorkouts(localWorkouts, request = fetch) {
       state.workouts = mergeWorkoutLists(state.workouts, [result.workout])
       continue
     }
-    if (!response.ok) fail(result.error || 'La synchronisation a échoué.')
+    if (!response.ok) fail(result.error || 'La synchronisation a échoué.', undefined, response.status)
     state.workouts = mergeWorkoutLists(state.workouts, [syncedWorkout])
     uploaded += 1
   }

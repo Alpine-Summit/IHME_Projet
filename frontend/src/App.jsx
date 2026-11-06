@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import './local.css'
 import './professional.css'
@@ -105,6 +105,7 @@ function App() {
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
   const fileInput = useRef(null)
+  const automaticSyncAttempted = useRef(false)
 
   useEffect(() => {
     let active = true
@@ -136,6 +137,28 @@ function App() {
   }, [])
 
   useEffect(() => {
+    function reconnectAccount() {
+      fetch('/api/me', { credentials: 'same-origin' })
+        .then(async (response) => {
+          if (response.status === 401) {
+            if (automaticSyncAttempted.current) automaticSyncAttempted.current = false
+            setAccount(null)
+            setAccountService({ status: 'available', message: '' })
+            return
+          }
+          const result = await accountResult(response)
+          setAccount(result.user)
+          setAccountService({ status: 'available', message: '' })
+        })
+        .catch((error) => {
+          setAccountService({ status: 'unavailable', message: `${error.message} Vous pouvez continuer à utiliser l’application et vos données locales.` })
+        })
+    }
+    window.addEventListener('online', reconnectAccount)
+    return () => window.removeEventListener('online', reconnectAccount)
+  }, [])
+
+  useEffect(() => {
     if (ready) writeAppData(data).catch((error) => setNotice(`La sauvegarde locale a échoué : ${error.message}`))
   }, [data, ready])
 
@@ -147,31 +170,47 @@ function App() {
 
   const activeWorkout = data.workouts.find((workout) => workout.id === activeWorkoutId)
   function updateAccount(user) {
+    if (!user) automaticSyncAttempted.current = false
     setAccount(user)
     setAccountService({ status: 'available', message: '' })
   }
-  async function synchronizeWorkouts() {
+  const synchronizeWorkouts = useCallback(async (automatic = false) => {
     setSyncing(true)
-    setSyncMessage('')
+    setSyncMessage(automatic ? 'Synchronisation automatique en cours…' : '')
     try {
       const result = await syncLocalWorkouts(data.workouts)
       setData((current) => ({ ...current, workouts: mergeWorkoutLists(current.workouts, result.workouts) }))
       const parts = []
       if (result.uploaded) parts.push(`${result.uploaded} envoyée${result.uploaded > 1 ? 's' : ''}`)
       if (result.downloaded) parts.push(`${result.downloaded} récupérée${result.downloaded > 1 ? 's' : ''}`)
-      setSyncMessage(parts.length ? `Synchronisation terminée : ${parts.join(', ')}.` : 'Tout est déjà synchronisé.')
+      const summary = parts.length ? `Synchronisation terminée : ${parts.join(', ')}.` : 'Tout est déjà synchronisé.'
+      setSyncMessage(automatic ? `Automatique — ${summary}` : summary)
     } catch (error) {
       if (Array.isArray(error.workouts)) {
         setData((current) => ({ ...current, workouts: mergeWorkoutLists(current.workouts, error.workouts) }))
       }
+      if (error.status === 401) {
+        automaticSyncAttempted.current = false
+        setAccount(null)
+        setAccountService({ status: 'available', message: '' })
+        setSyncMessage('Votre session a expiré. Reconnectez-vous pour synchroniser vos séances.')
+        setSyncing(false)
+        return
+      }
       const progress = []
       if (error.uploaded) progress.push(`${error.uploaded} envoyée${error.uploaded > 1 ? 's' : ''}`)
       if (error.downloaded) progress.push(`${error.downloaded} récupérée${error.downloaded > 1 ? 's' : ''}`)
-      setSyncMessage(`${progress.length ? `${progress.join(', ')}. ` : ''}Synchronisation incomplète : ${error.message}`)
+      const summary = `${progress.length ? `${progress.join(', ')}. ` : ''}Synchronisation incomplète : ${error.message}`
+      setSyncMessage(automatic ? `Automatique — ${summary}` : summary)
     } finally {
       setSyncing(false)
     }
-  }
+  }, [data.workouts])
+  useEffect(() => {
+    if (!ready || !account || syncing || automaticSyncAttempted.current) return
+    automaticSyncAttempted.current = true
+    synchronizeWorkouts(true)
+  }, [ready, account, syncing, synchronizeWorkouts])
   function updateProfile(profile) { setData((current) => ({ ...current, profile })) }
   function addWorkout(workout) {
     setData((current) => ({ ...current, workouts: [workout, ...current.workouts] }))
@@ -366,7 +405,7 @@ function AccountPage({ account, service, onAccountChange }) {
       </> : <>
         <p className="eyebrow">CONNEXION FACULTATIVE</p>
         <h2>{mode === 'register' ? 'Créer un compte' : 'Accéder à votre compte'}</h2>
-        <p>Un compte permet de vous identifier auprès du serveur. La connexion ne modifie pas vos données locales et ne les envoie pas vers PostgreSQL.</p>
+        <p>Un compte permet de vous identifier auprès du serveur. Vos données restent disponibles localement ; avec une session active, les séances se synchronisent automatiquement à l’ouverture lorsque le réseau et le serveur sont disponibles.</p>
         {service.status === 'checking' && <p className="account-service-message">Vérification du service de compte…</p>}
         {service.status === 'unavailable' && <p className="error" role="status">{service.message}</p>}
         <form className="account-form" onSubmit={submit}>
@@ -670,7 +709,7 @@ function Settings({ data, account, accountService, syncing, syncMessage, onSync,
     <section className="panel account-sync-panel">
       <p className="eyebrow">SAUVEGARDE DU COMPTE</p>
       <h2>Synchroniser mes séances</h2>
-      <p>Envoyez les séances locales vers votre compte et récupérez celles déjà enregistrées depuis vos autres appareils. Votre calendrier reste disponible hors connexion.</p>
+      <p>Lorsque vous êtes connecté et que le réseau est disponible, les séances sont synchronisées automatiquement à l’ouverture. Vous pouvez aussi relancer la synchronisation ici. Votre calendrier reste disponible hors connexion.</p>
       {account
         ? <p className="account-sync-status">Connecté en tant que <strong>{account.email}</strong></p>
         : <p className="note">{accountService.status === 'unavailable' ? accountService.message : 'Connectez-vous pour synchroniser une copie de vos séances sur votre compte.'}</p>}
