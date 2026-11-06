@@ -1,4 +1,4 @@
-export const DATA_VERSION = 4
+export const DATA_VERSION = 5
 
 function isValidProfile(profile) {
   return profile
@@ -17,7 +17,7 @@ function isValidWorkout(workout) {
     && workout.title.length <= 100
     && Array.isArray(workout.exercises)
     && workout.exercises.every((exercise) => exercise && typeof exercise === 'object' && !Array.isArray(exercise))
-    && ['generated', 'planned', 'started', 'completed'].includes(workout.status)
+    && ['generated', 'planned', 'started', 'completed', 'postponed', 'cancelled'].includes(workout.status)
 }
 
 export function exportData(data) {
@@ -34,7 +34,7 @@ export function parseImport(text) {
   let payload
   try { payload = JSON.parse(text) } catch { throw new Error('Le fichier sélectionné n’est pas un JSON valide.') }
   const supportedFormats = ['apex-training-data', 'move-training-data']
-  const supportedVersions = [1, 2, 3, DATA_VERSION]
+  const supportedVersions = [1, 2, 3, 4, DATA_VERSION]
   if (!supportedFormats.includes(payload?.format) || !supportedVersions.includes(payload.version) || !isValidProfile(payload.data?.profile) || !Array.isArray(payload.data.workouts) || !payload.data.workouts.every(isValidWorkout)) throw new Error('Ce fichier n’est pas une sauvegarde APEX valide ou sa version est incompatible.')
   return payload.data
 }

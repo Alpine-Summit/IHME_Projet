@@ -16,6 +16,18 @@ test('JSON import keeps older versioned backups available for local migration', 
   assert.equal(result.profile.bodyMass, 72)
 })
 
+test('JSON import accepts version 4 backups and postponed or cancelled sessions', () => {
+  for (const status of ['postponed', 'cancelled']) {
+    const data = {
+      ...validData,
+      version: 4,
+      workouts: [{ id: status, title: 'Séance', status, exercises: [] }],
+    }
+    const result = parseImport(JSON.stringify({ format: 'apex-training-data', version: 4, data }))
+    assert.equal(result.workouts[0].status, status)
+  }
+})
+
 test('JSON import rejects malformed or incompatible backups', () => {
   assert.throws(() => parseImport('{not-json'), /JSON valide/)
   assert.throws(() => parseImport(JSON.stringify({ format: 'apex-training-data', version: 99, data: validData })), /incompatible/)

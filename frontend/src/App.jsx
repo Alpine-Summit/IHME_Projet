@@ -1,20 +1,32 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import './local.css'
+import './professional.css'
 import { EXERCISES, MUSCLE_GROUPS, OBJECTIVES } from './data/exercises'
 import apexLogo from './assets/apex-logo.svg'
 import { generateWorkout, MIN_WORKOUT_EXERCISES, prescribeExercise, refreshWorkout } from './engine/workoutEngine'
+import { beginWorkout, completeWorkout, createRealization, snapshotWorkout } from './engine/workoutLifecycle'
 import { exportData, parseImport } from './storage/dataTransfer'
 import { readAppData, writeAppData } from './storage/indexedDb'
 
 const emptyProfile = { firstName: '', bodyMass: '' }
-const initialData = { version: 4, profile: emptyProfile, workouts: [] }
+const initialData = { version: 5, profile: emptyProfile, workouts: [] }
 const tabs = [['home', 'Créer'], ['calendar', 'Calendrier'], ['history', 'Historique'], ['settings', 'Sauvegarde']]
+const STATUS_LABELS = { planned: 'Planifiée', started: 'En cours', completed: 'Réalisée', postponed: 'Reportée', cancelled: 'Annulée' }
+const EXERCISE_GROUPS = [
+  { title: 'Membres inférieurs', muscles: ['Quadriceps', 'Ischio-jambiers', 'Fessiers', 'Mollets', 'Adducteurs', 'Abducteurs', 'Tibial antérieur', 'Fléchisseurs de hanche', 'Hanches'] },
+  { title: 'Tronc', muscles: ['Abdominaux', 'Obliques', 'Lombaires'] },
+  { title: 'Membres supérieurs', muscles: ['Pectoraux', 'Grand dorsal', 'Trapèzes', 'Rhomboïdes', 'Épaules', 'Biceps', 'Triceps', 'Avant-bras'] },
+]
 
 function isValidDateKey(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const timestamp = Date.parse(`${value}T00:00:00.000Z`)
   return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value
+}
+
+function localDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 function normalizeData(stored) {
@@ -40,7 +52,21 @@ function normalizeData(stored) {
     const scheduledFor = isValidDateKey(workout.scheduledFor)
       ? workout.scheduledFor
       : localDateKey(Number.isFinite(createdAt.getTime()) ? createdAt : new Date())
-    return { ...cleanWorkout, exercises, title: hasLegacyDurationTitle ? `${objectiveLabel} · séance` : workout.title, warmup, scheduledFor }
+    const status = ['planned', 'started', 'completed', 'postponed', 'cancelled'].includes(workout.status) ? workout.status : 'planned'
+    const normalized = {
+      ...cleanWorkout,
+      exercises,
+      title: hasLegacyDurationTitle ? `${objectiveLabel} · séance` : workout.title,
+      warmup,
+      scheduledFor,
+      status,
+      notes: workout.notes || {},
+    }
+    if (status === 'started' || status === 'completed') {
+      normalized.plannedSnapshot = workout.plannedSnapshot || snapshotWorkout(normalized)
+      normalized.realization = workout.realization || createRealization(normalized.plannedSnapshot.exercises)
+    }
+    return normalized
   }) : []
   return { ...initialData, profile, workouts }
 }
@@ -62,7 +88,10 @@ function App() {
       .finally(() => { if (active) setReady(true) })
     return () => { active = false }
   }, [])
-  useEffect(() => { if (ready) writeAppData(data).catch(() => setNotice('La sauvegarde locale est momentanément indisponible.')) }, [data, ready])
+
+  useEffect(() => {
+    if (ready) writeAppData(data).catch((error) => setNotice(`La sauvegarde locale a échoué : ${error.message}`))
+  }, [data, ready])
 
   const activeWorkout = data.workouts.find((workout) => workout.id === activeWorkoutId)
   function updateProfile(profile) { setData((current) => ({ ...current, profile })) }
@@ -70,28 +99,88 @@ function App() {
     setData((current) => ({ ...current, workouts: [workout, ...current.workouts] }))
     setCalendarFocusDate(workout.scheduledFor)
     setTab('calendar')
-    setNotice('Séance créée et ajoutée au calendrier. Vous pourrez la modifier ou valider sa réalisation depuis cette page.')
+    setNotice('Séance planifiée et ajoutée au calendrier.')
   }
-  function updateWorkout(workout) { setData((current) => ({ ...current, workouts: current.workouts.map((item) => item.id === workout.id ? refreshWorkout(workout) : item) })) }
-  function deleteWorkout(id) { if (window.confirm('Supprimer définitivement cette séance ?')) { setData((current) => ({ ...current, workouts: current.workouts.filter((item) => item.id !== id) })); setNotice('Séance supprimée.') } }
-  function validateWorkout(id) {
-    const workout = data.workouts.find((item) => item.id === id)
-    if (!workout || workout.status === 'completed') return
-    if (!window.confirm(`Valider « ${workout.title} » comme séance réalisée ?`)) return
+  function updateWorkout(workout) {
     setData((current) => ({
       ...current,
-      workouts: current.workouts.map((item) => item.id === id
-        ? { ...item, status: 'completed', completedAt: new Date().toISOString() }
+      workouts: current.workouts.map((item) => {
+        if (item.id !== workout.id || item.status === 'completed') return item
+        if (item.status === 'started') {
+          return refreshWorkout({
+            ...item,
+            realization: workout.realization || item.realization,
+            notes: workout.notes || item.notes,
+          })
+        }
+        return refreshWorkout(workout)
+      }),
+    }))
+  }
+  function startWorkout(id) {
+    setData((current) => ({
+      ...current,
+      workouts: current.workouts.map((item) => item.id === id && ['planned', 'postponed'].includes(item.status) ? beginWorkout(item) : item),
+    }))
+    setNotice('Programme verrouillé. Renseignez maintenant les performances réalisées.')
+  }
+  function validateWorkout(id) {
+    const workout = data.workouts.find((item) => item.id === id)
+    if (!workout || workout.status !== 'started') return
+    if (!window.confirm(`Valider définitivement la réalisation de « ${workout.title} » ? Le programme sera conservé comme référence historique.`)) return
+    setData((current) => ({
+      ...current,
+      workouts: current.workouts.map((item) => item.id === id && item.status === 'started' ? completeWorkout(item) : item),
+    }))
+    setNotice('Séance validée. Son programme et sa réalisation sont conservés dans votre historique.')
+  }
+  function changeSchedule(id, date) {
+    if (!isValidDateKey(date)) {
+      setNotice('Choisissez une date de séance valide.')
+      return
+    }
+    const workout = data.workouts.find((item) => item.id === id)
+    if (!workout || !['planned', 'postponed'].includes(workout.status)) return
+    setData((current) => ({
+      ...current,
+      workouts: current.workouts.map((item) => item.id === id && ['planned', 'postponed'].includes(item.status)
+        ? refreshWorkout({ ...item, scheduledFor: date })
         : item),
     }))
-    setNotice('Séance validée et ajoutée à votre historique.')
+    setCalendarFocusDate(date)
+    setTab('calendar')
+    setNotice('Date modifiée. Le calendrier a été mis à jour.')
+  }
+  function changeStatus(id, status) {
+    if (!['planned', 'postponed', 'cancelled'].includes(status)) return
+    setData((current) => ({
+      ...current,
+      workouts: current.workouts.map((item) => item.id === id && item.status !== 'completed' && item.status !== 'started'
+        ? refreshWorkout({ ...item, status })
+        : item),
+    }))
+    setNotice(`Statut mis à jour : ${STATUS_LABELS[status].toLowerCase()}.`)
+  }
+  function deleteWorkout(id) {
+    if (!window.confirm('Supprimer définitivement cette séance et son historique ? Cette action ne peut pas être annulée.')) return
+    setData((current) => ({ ...current, workouts: current.workouts.filter((item) => item.id !== id) }))
+    setNotice('Séance supprimée.')
   }
   function openWorkout(id) { setActiveWorkoutId(id); setTab('workout') }
   function importFile(event) {
     const file = event.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = () => { try { if (data.workouts.length && !window.confirm('Remplacer les données actuelles par cette sauvegarde ?')) return; setData(normalizeData(parseImport(reader.result))); setNotice('Sauvegarde importée.'); setTab('home') } catch (error) { setNotice(error.message) } }
+    reader.onload = () => {
+      try {
+        if (data.workouts.length && !window.confirm('Remplacer les données actuelles par cette sauvegarde ?')) return
+        setData(normalizeData(parseImport(reader.result)))
+        setNotice('Sauvegarde importée.')
+        setTab('home')
+      } catch (error) {
+        setNotice(error.message)
+      }
+    }
     reader.onerror = () => setNotice('Impossible de lire le fichier sélectionné.')
     reader.readAsText(file)
     event.target.value = ''
@@ -114,70 +203,251 @@ function App() {
       </header>
       {notice && <div className="notice" role="status"><span>{notice}</span><button onClick={() => setNotice('')}>Fermer</button></div>}
       {tab === 'home' && <Home profile={data.profile} workouts={data.workouts} onProfileChange={updateProfile} onCreate={addWorkout} />}
-      {tab === 'calendar' && <Calendar workouts={data.workouts} focusDate={calendarFocusDate} onOpen={openWorkout} onDelete={deleteWorkout} onValidate={validateWorkout} />}
+      {tab === 'calendar' && <Calendar key={calendarFocusDate || 'current'} workouts={data.workouts} focusDate={calendarFocusDate} onOpen={openWorkout} onDelete={deleteWorkout} />}
       {tab === 'history' && <History workouts={data.workouts} onOpen={openWorkout} onDelete={deleteWorkout} />}
       {tab === 'settings' && <Settings data={data} onImport={() => fileInput.current?.click()} />}
-      {tab === 'workout' && activeWorkout && <WorkoutEditor workout={activeWorkout} onChange={updateWorkout} onNotice={setNotice} onBack={() => setTab('calendar')} />}
+      {tab === 'workout' && activeWorkout && <WorkoutEditor
+        key={activeWorkout.id}
+        workout={activeWorkout}
+        onChange={updateWorkout}
+        onStart={() => startWorkout(activeWorkout.id)}
+        onComplete={() => validateWorkout(activeWorkout.id)}
+        onReschedule={(date) => changeSchedule(activeWorkout.id, date)}
+        onStatusChange={(status) => changeStatus(activeWorkout.id, status)}
+        onDelete={() => deleteWorkout(activeWorkout.id)}
+        onNotice={setNotice}
+        onBack={() => setTab('calendar')}
+      />}
       {tab === 'workout' && !activeWorkout && <Empty title="Séance introuvable" text="Retournez au calendrier pour choisir une séance." />}
     </main>
   )
 }
 
 function Home({ profile, workouts, onProfileChange, onCreate }) {
-  return <><section className="welcome"><div className="welcome-copy"><p className="eyebrow">APEX PERFORMANCE · STRENGTH SYSTEMS</p>{profile.firstName && <p className="hero-greeting">Bonjour, {profile.firstName}</p>}<h1>Construisez la force qui sert votre performance.</h1><p className="muted">Un assistant de préparation physique de précision : une base de séance structurée, des recommandations lisibles, et le contrôle final entre vos mains.</p><div className="hero-points"><span>Programmation orientée performance</span><span>Chaque mouvement ajustable</span><span>Confidentialité locale</span></div></div><div className="stat"><strong>{workouts.filter((item) => item.status === 'completed').length}</strong><span>séances terminées</span><small>Une progression documentée, séance après séance.</small></div></section><Profile profile={profile} onChange={onProfileChange} /><Generator profile={profile} history={workouts} onCreate={onCreate} /></>
+  const upcoming = workouts.filter((workout) => ['planned', 'postponed'].includes(workout.status))
+  return <>
+    <section className="welcome">
+      <div className="welcome-copy">
+        <p className="eyebrow">APEX PERFORMANCE · ENDURANCE STRENGTH</p>
+        {profile.firstName && <p className="hero-greeting">Bonjour, {profile.firstName}</p>}
+        <h1>La force au service de votre endurance.</h1>
+        <p className="muted">Planifiez vos séances de renforcement, suivez chaque réalisation et construisez une préparation cohérente au fil de votre saison.</p>
+        <div className="hero-points"><span>Programme structuré</span><span>Historique de réalisation</span><span>Données privées sur cet appareil</span></div>
+      </div>
+      <div className="stat"><strong>{upcoming.length}</strong><span>séances à venir</span><small>{workouts.filter((item) => item.status === 'completed').length} séances réalisées et archivées</small></div>
+    </section>
+    <Profile profile={profile} onChange={onProfileChange} />
+    <Generator profile={profile} history={workouts} onCreate={onCreate} />
+  </>
 }
 
 function Profile({ profile, onChange }) {
-  return <section className="panel profile profile-compact"><div className="panel-heading"><div><p className="eyebrow">PERSONNALISATION</p><h2>Un repère pour vos recommandations</h2><p className="muted">Les séances partent d’une pratique avancée. Votre masse corporelle sert à contextualiser des charges indicatives, jamais imposées.</p></div><span className="badge">Enregistré sur cet appareil</span></div><div className="profile-fields"><label className="weight-field">Prénom <span>(pour votre accueil)</span><input type="text" autoComplete="given-name" maxLength="40" placeholder="Ex : Paul" value={profile.firstName} onChange={(event) => onChange({ ...profile, firstName: event.target.value })} /></label><label className="weight-field">Masse corporelle <span>(facultative)</span><div className="input-suffix"><input type="number" min="20" max="300" step="0.1" placeholder="Ex. 72" value={profile.bodyMass} onChange={(event) => onChange({ ...profile, bodyMass: event.target.value })} /><b>kg</b></div><small>Les charges proposées restent indicatives et modifiables.</small></label></div></section>
+  return <section className="panel profile profile-compact">
+    <div className="panel-heading"><div><p className="eyebrow">VOTRE PROFIL</p><h2>Personnaliser les repères</h2><p className="muted">La masse corporelle ajuste les suggestions de charge indicatives. Toutes les valeurs restent modifiables.</p></div><span className="badge">Enregistré sur cet appareil</span></div>
+    <div className="profile-fields">
+      <label className="weight-field">Prénom <span>(facultatif)</span><input type="text" autoComplete="given-name" maxLength="40" placeholder="Ex. Alex" value={profile.firstName} onChange={(event) => onChange({ ...profile, firstName: event.target.value })} /></label>
+      <label className="weight-field">Masse corporelle <span>(facultative)</span><div className="input-suffix"><input type="number" min="20" max="300" step="0.1" placeholder="Ex. 72" value={profile.bodyMass} onChange={(event) => onChange({ ...profile, bodyMass: event.target.value })} /><b>kg</b></div><small>Les charges proposées restent indicatives et modifiables.</small></label>
+    </div>
+  </section>
 }
 
-function ChoiceGroup({ title, values, selected, onToggle }) { return <fieldset><legend>{title}</legend><div className="chips">{values.map((value) => <label className={selected.includes(value) ? 'chip selected' : 'chip'} key={value}><input type="checkbox" checked={selected.includes(value)} onChange={() => onToggle(value)} />{value}</label>)}</div></fieldset> }
+function ChoiceGroup({ title, values, selected, onToggle }) {
+  return <fieldset className="muscle-choices"><legend>{title}</legend><div className="chips">{values.map((value) => <label className={selected.includes(value) ? 'chip selected' : 'chip'} key={value}><input type="checkbox" checked={selected.includes(value)} onChange={() => onToggle(value)} />{value}</label>)}</div></fieldset>
+}
 
 function Generator({ profile, history, onCreate }) {
   const [objective, setObjective] = useState('general')
   const [title, setTitle] = useState('')
-  const [date, setDate] = useState('')
+  const [date, setDate] = useState(() => localDateKey(new Date()))
   const [muscles, setMuscles] = useState([])
   const [error, setError] = useState('')
   function toggleMuscle(value) { setMuscles((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]) }
-  function submit(event) { event.preventDefault(); try { setError(''); onCreate(generateWorkout({ ...profile, muscles }, { objective, title, scheduledFor: date, recentWorkouts: history })) } catch (generationError) { setError(generationError.message) } }
-  return (
-    <section className="dashboard-grid">
-      <form className="panel generator" onSubmit={submit}>
-        <div className="generator-heading">
-          <div><p className="eyebrow">CRÉER UNE SÉANCE</p><h2>Votre prochaine séance, pensée pour vous.</h2></div>
-          <span className="step-label">APEX / 01</span>
-        </div>
-        <p className="muted">Définissez l’intention et les zones à travailler. APEX propose au moins 4 mouvements, et davantage si nécessaire pour couvrir les muscles sélectionnés.</p>
-        <label>Titre de la séance <span className="field-hint">(pour la retrouver facilement)</span><input type="text" maxLength="100" placeholder="Ex. Force — bas du corps" value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-        <label>Objectif<select value={objective} onChange={(event) => setObjective(event.target.value)}>{OBJECTIVES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-        <ChoiceGroup title="Groupes musculaires à cibler" values={MUSCLE_GROUPS} selected={muscles} onToggle={toggleMuscle} />
-        <label>Date de la séance <span className="field-hint">(obligatoire pour l’ajouter au calendrier)</span><input type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></label>
-        <button className="primary">Créer et planifier ma séance <span>→</span></button>
-        {error && <p className="error" role="alert">{error}</p>}
-        <p className="note">La séance sera enregistrée et affichée immédiatement à la date choisie. Vous pourrez ensuite la modifier ou valider sa réalisation depuis le calendrier.</p>
-      </form>
-    </section>
-  )
+  function submit(event) {
+    event.preventDefault()
+    try {
+      setError('')
+      onCreate(generateWorkout({ ...profile, muscles }, { objective, title, scheduledFor: date, recentWorkouts: history }))
+    } catch (generationError) {
+      setError(generationError.message)
+    }
+  }
+  return <section className="dashboard-grid">
+    <form className="panel generator" onSubmit={submit}>
+      <div className="generator-heading"><div><p className="eyebrow">PROGRAMMATION</p><h2>Préparer une séance</h2></div><span className="step-label">NOUVELLE SÉANCE</span></div>
+      <p className="muted">Choisissez une orientation, vos groupes musculaires et une date. Le programme proposé reste entièrement ajustable avant la séance.</p>
+      <label>Titre <span className="field-hint">(facultatif)</span><input type="text" maxLength="100" placeholder="Ex. Force — bas du corps" value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+      <label>Orientation de séance<select value={objective} onChange={(event) => setObjective(event.target.value)}>{OBJECTIVES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <ChoiceGroup title="Groupes musculaires ciblés" values={MUSCLE_GROUPS} selected={muscles} onToggle={toggleMuscle} />
+      <label>Date prévue<input type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></label>
+      {error && <p className="error" role="alert">{error}</p>}
+      <button className="primary">Créer et planifier <span>→</span></button>
+      <p className="note">La séance apparaîtra au calendrier avec le statut « Planifiée ». Vous pourrez modifier son programme jusqu’au début de sa réalisation.</p>
+    </form>
+  </section>
 }
 
-function WorkoutEditor({ workout, onChange, onBack, onNotice }) {
-  const [practice, setPractice] = useState(workout.status === 'started')
-  const [newExerciseId, setNewExerciseId] = useState('')
-  const [replacementIds, setReplacementIds] = useState({})
-  function changeExercise(index, field, value) { onChange({ ...workout, exercises: workout.exercises.map((exercise, itemIndex) => itemIndex === index ? { ...exercise, [field]: value } : exercise) }) }
-  function move(index, direction) { const exercises = [...workout.exercises]; const target = index + direction; if (target < 0 || target >= exercises.length) return; [exercises[index], exercises[target]] = [exercises[target], exercises[index]]; onChange({ ...workout, exercises }); onNotice('Ordre des exercices mis à jour.') }
-  function remove(index) { if (workout.exercises.length <= MIN_WORKOUT_EXERCISES) { onNotice(`Une séance doit conserver au moins ${MIN_WORKOUT_EXERCISES} exercices.`); return } onChange({ ...workout, exercises: workout.exercises.filter((_, itemIndex) => itemIndex !== index) }); onNotice('Exercice supprimé de la séance.') }
-  function addExercise() { const exercise = EXERCISES.find((item) => item.id === newExerciseId && item.levels?.includes('avance')); if (!exercise) return; onChange({ ...workout, exercises: [...workout.exercises, prescribeExercise(exercise, workout.objective, workout.bodyMass)] }); setNewExerciseId(''); onNotice('Exercice ajouté à la séance.') }
-  function replace(index) { const exercise = EXERCISES.find((item) => item.id === replacementIds[index] && item.levels?.includes('avance')); if (!exercise) return; const prescribed = prescribeExercise(exercise, workout.objective, workout.bodyMass); onChange({ ...workout, exercises: workout.exercises.map((item, itemIndex) => itemIndex === index ? prescribed : item) }); setReplacementIds((current) => ({ ...current, [index]: '' })); onNotice('Exercice remplacé.') }
-  function togglePractice() { const nextStatus = practice ? 'planned' : 'started'; setPractice(!practice); onChange({ ...workout, status: nextStatus, startedAt: nextStatus === 'started' ? new Date().toISOString() : workout.startedAt }) }
-  function complete() { onChange({ ...workout, status: 'completed', completedAt: new Date().toISOString() }); setPractice(false) }
-  function cardExercise(exercise, index) { const replacement = replacementIds[index]; return <article className={`panel exercise-card ${practice && index === 0 ? 'current' : ''}`} key={`${exercise.exerciseId}-${index}`}><div className="panel-heading"><div><span className="step">{index + 1}</span><h2>{exercise.name}</h2><p className="muted">{exercise.muscles.join(' · ')} · {exercise.equipment.join(', ')}</p></div><div className="row-actions">{!practice && <><button className="icon-button" title="Monter" aria-label="Monter" onClick={() => move(index, -1)}>↑</button><button className="icon-button" title="Descendre" aria-label="Descendre" onClick={() => move(index, 1)}>↓</button><button className="danger" onClick={() => remove(index)}>Supprimer</button></>}</div></div><p>{exercise.instruction}</p>{exercise.loadSuggestion && <p className="load-suggestion"><b>Point de départ indicatif :</b> {exercise.loadSuggestion.minKg}–{exercise.loadSuggestion.maxKg} kg · {exercise.loadSuggestion.note}. Commencez bas et gardez 2–3 répétitions en réserve.</p>}<div className="exercise-grid"><label>Séries<input type="number" min="1" max="12" value={exercise.sets} onChange={(event) => changeExercise(index, 'sets', Number(event.target.value))} /></label><label>Répétitions / format<input value={exercise.reps} onChange={(event) => changeExercise(index, 'reps', event.target.value)} /></label><label>Repos (s)<input type="number" min="0" max="600" value={exercise.restSeconds} onChange={(event) => changeExercise(index, 'restSeconds', Number(event.target.value))} /></label><label>Charge utilisée<input placeholder="Ex. 8 kg" value={exercise.load} onChange={(event) => changeExercise(index, 'load', event.target.value)} /></label></div>{practice && <label>Résultat réalisé<input placeholder="Ex. 3 × 10, RPE 7" value={exercise.performance?.[0] || ''} onChange={(event) => changeExercise(index, 'performance', [event.target.value])} /></label>}{!practice && <div className="replace-row"><select value={replacement || ''} onChange={(event) => setReplacementIds((current) => ({ ...current, [index]: event.target.value }))}><option value="">Remplacer ce mouvement…</option>{EXERCISES.filter((item) => item.objectives.includes(workout.objective)).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="secondary" type="button" disabled={!replacement} onClick={() => replace(index)}>Remplacer</button></div>}<details><summary>Consignes et variantes</summary><p><b>Attention :</b> {exercise.errors}</p><p><b>Précaution :</b> {exercise.precautions}</p><p><b>Plus facile :</b> {exercise.easier} · <b>Plus difficile :</b> {exercise.harder}</p></details></article> }
-  return <section className="workout-view"><div className="section-heading"><button className="text-button" onClick={onBack}>← Retour</button><div><p className="eyebrow">{practice ? 'MODE ENTRAÎNEMENT' : 'SÉANCE MODIFIABLE'}</p><h1>{workout.title}</h1><p className="muted">{workout.objective} · {workout.exercises.length} mouvements</p></div><div className="row-actions">{!practice && workout.status !== 'completed' && <button className="primary small" onClick={togglePractice}>Commencer</button>}{practice && <button className="primary small" onClick={complete}>Terminer</button>}</div></div><div className="workout-layout"><section className="panel"><div className="panel-heading"><h2>Préparation</h2><span className="badge">Progressive</span></div><p>{workout.warmup.description}</p><p className="note">{workout.safety}</p>{workout.variationNote && <p className="variation-note">{workout.variationNote}</p>}{!practice && <div className="add-exercise"><select value={newExerciseId} onChange={(event) => setNewExerciseId(event.target.value)}><option value="">Ajouter un exercice…</option>{EXERCISES.filter((item) => item.objectives.includes(workout.objective)).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button className="secondary" type="button" onClick={addExercise}>Ajouter</button></div>}</section>{workout.exercises.map(cardExercise)}</div></section>
+function ExerciseLibraryPicker({ objective, onSelect, buttonLabel = 'Ajouter' }) {
+  const [query, setQuery] = useState('')
+  const normalizedQuery = query.trim().toLocaleLowerCase('fr')
+  const available = EXERCISES.filter((exercise) => exercise.objectives.includes(objective))
+  const categoryGroups = EXERCISE_GROUPS.map((category) => ({
+    ...category,
+    subgroups: category.muscles.map((muscle) => ({
+      muscle,
+      exercises: available.filter((exercise) => exercise.muscles[0] === muscle
+        || (!EXERCISE_GROUPS.some((group) => group.muscles.includes(exercise.muscles[0])) && exercise.muscles.includes(muscle))),
+    })).filter((group) => group.exercises.length),
+  })).filter((category) => category.subgroups.length)
+  const searchResults = normalizedQuery ? available.filter((exercise) => `${exercise.name} ${exercise.muscles.join(' ')}`.toLocaleLowerCase('fr').includes(normalizedQuery)) : []
+  function exerciseButton(exercise) {
+    return <button className="library-exercise" type="button" key={exercise.id} onClick={() => { onSelect(exercise); setQuery('') }}>
+      <span>{exercise.name}<small>{exercise.muscles.join(' · ')}</small></span><b>{buttonLabel}</b>
+    </button>
+  }
+  return <div className="exercise-library">
+    <label className="library-search">Rechercher un exercice<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom ou groupe musculaire" /></label>
+    {normalizedQuery
+      ? <div className="library-results">{searchResults.length ? searchResults.map(exerciseButton) : <p className="note">Aucun exercice correspondant.</p>}</div>
+      : <div className="library-categories">{categoryGroups.map((category) => <details key={category.title}>
+        <summary>{category.title}<span>{category.subgroups.reduce((total, subgroup) => total + subgroup.exercises.length, 0)} exercices</span></summary>
+        {category.subgroups.map((subgroup) => <section className="library-subgroup" key={subgroup.muscle}>
+          <h4>{subgroup.muscle}</h4>
+          {subgroup.exercises.map(exerciseButton)}
+        </section>)}
+      </details>)}</div>}
+  </div>
 }
 
-function localDateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` }
-function Calendar({ workouts, focusDate, onOpen, onDelete, onValidate }) {
+function WorkoutEditor({ workout, onChange, onStart, onComplete, onReschedule, onStatusChange, onDelete, onNotice, onBack }) {
+  const [view, setView] = useState(workout.status === 'started' ? 'realization' : 'program')
+  const [newDate, setNewDate] = useState(workout.scheduledFor)
+  const locked = workout.status === 'started' || workout.status === 'completed'
+  const plan = workout.plannedSnapshot || snapshotWorkout(workout)
+  const realization = workout.realization || createRealization(plan.exercises)
+
+  function changePlannedExercise(index, field, value) {
+    if (workout.status !== 'planned') return
+    onChange({ ...workout, exercises: workout.exercises.map((exercise, itemIndex) => itemIndex === index ? { ...exercise, [field]: value } : exercise) })
+  }
+  function changeActual(index, field, value) {
+    if (workout.status !== 'started') return
+    const actualExercises = realization.exercises.map((exercise, itemIndex) => itemIndex === index ? { ...exercise, [field]: value } : exercise)
+    onChange({ ...workout, realization: { ...realization, exercises: actualExercises } })
+  }
+  function updateNotes(field, value) {
+    if (workout.status !== 'started') return
+    onChange({ ...workout, notes: { ...workout.notes, [field]: value } })
+  }
+  function addExercise(exercise) {
+    if (!exercise || workout.status !== 'planned') return
+    onChange({ ...workout, exercises: [...workout.exercises, prescribeExercise(exercise, workout.objective, workout.bodyMass)] })
+    onNotice(`${exercise.name} ajouté au programme.`)
+  }
+  function replaceExercise(index, exercise) {
+    if (!exercise || workout.status !== 'planned') return
+    onChange({ ...workout, exercises: workout.exercises.map((item, itemIndex) => itemIndex === index ? prescribeExercise(exercise, workout.objective, workout.bodyMass) : item) })
+    onNotice(`Mouvement remplacé par ${exercise.name}.`)
+  }
+  function removeExercise(index) {
+    if (workout.exercises.length <= MIN_WORKOUT_EXERCISES) {
+      onNotice(`Une séance doit conserver au moins ${MIN_WORKOUT_EXERCISES} exercices.`)
+      return
+    }
+    onChange({ ...workout, exercises: workout.exercises.filter((_, itemIndex) => itemIndex !== index) })
+  }
+  function moveExercise(index, direction) {
+    const exercises = [...workout.exercises]
+    const target = index + direction
+    if (target < 0 || target >= exercises.length) return
+    ;[exercises[index], exercises[target]] = [exercises[target], exercises[index]]
+    onChange({ ...workout, exercises })
+  }
+  function toggleSkipped(index) {
+    const current = realization.exercises[index]
+    changeActual(index, 'skipped', !current.skipped)
+  }
+  function planCard(exercise, index) {
+    return <article className="panel exercise-card" key={`${exercise.exerciseId}-${index}`}>
+      <div className="panel-heading"><div><span className="step">{index + 1}</span><h2>{exercise.name}</h2><p className="muted">{exercise.muscles.join(' · ')} · {exercise.equipment.join(', ')}</p></div>
+        {!locked && <div className="row-actions"><button className="icon-button" type="button" aria-label="Monter" disabled={index === 0} onClick={() => moveExercise(index, -1)}>↑</button><button className="icon-button" type="button" aria-label="Descendre" disabled={index === workout.exercises.length - 1} onClick={() => moveExercise(index, 1)}>↓</button><button className="danger" type="button" onClick={() => removeExercise(index)}>Supprimer</button></div>}
+      </div>
+      <p>{exercise.instruction}</p>
+      {exercise.loadSuggestion && <p className="load-suggestion"><b>Repère indicatif :</b> {exercise.loadSuggestion.minKg}–{exercise.loadSuggestion.maxKg} kg · {exercise.loadSuggestion.note}.</p>}
+      <div className="exercise-grid">
+        <label>Séries prévues<input type="number" min="1" max="12" value={exercise.sets} disabled={locked} onChange={(event) => changePlannedExercise(index, 'sets', Number(event.target.value))} /></label>
+        <label>Répétitions / format<input value={exercise.reps} disabled={locked} onChange={(event) => changePlannedExercise(index, 'reps', event.target.value)} /></label>
+        <label>Récupération (s)<input type="number" min="0" max="600" value={exercise.restSeconds} disabled={locked} onChange={(event) => changePlannedExercise(index, 'restSeconds', Number(event.target.value))} /></label>
+        <label>Charge prévue<input placeholder="Ex. 8 kg" value={exercise.load} disabled={locked} onChange={(event) => changePlannedExercise(index, 'load', event.target.value)} /></label>
+      </div>
+      <details><summary>Consignes et variantes</summary><p><b>Point de vigilance :</b> {exercise.errors}</p><p><b>Précaution :</b> {exercise.precautions}</p><p><b>Adapter :</b> {exercise.easier} · <b>Progression :</b> {exercise.harder}</p></details>
+      {!locked && <ExerciseLibraryPicker objective={workout.objective} buttonLabel="Remplacer" onSelect={(selected) => replaceExercise(index, selected)} />}
+    </article>
+  }
+  function actualCard(exercise, index) {
+    const actual = realization.exercises[index] || {}
+    return <article className={`panel exercise-card actual-card ${actual.skipped ? 'skipped' : ''}`} key={`${exercise.exerciseId}-${index}`}>
+      <div className="panel-heading"><div><span className="step">{index + 1}</span><h2>{exercise.name}</h2><p className="muted">Prévu : {exercise.sets} séries · {exercise.reps} répétitions · {exercise.load || 'sans charge précisée'}</p></div>
+        <label className="skipped-control"><input type="checkbox" checked={Boolean(actual.skipped)} onChange={() => toggleSkipped(index)} disabled={workout.status !== 'started'} /> Non réalisé</label>
+      </div>
+      {!actual.skipped && <div className="exercise-grid">
+        <label>Séries réalisées<input type="number" min="0" max="12" value={actual.sets ?? ''} disabled={workout.status !== 'started'} onChange={(event) => changeActual(index, 'sets', event.target.value === '' ? '' : Number(event.target.value))} /></label>
+        <label>Répétitions réalisées<input value={actual.reps ?? ''} disabled={workout.status !== 'started'} placeholder="Ex. 8 / 8 / 7" onChange={(event) => changeActual(index, 'reps', event.target.value)} /></label>
+        <label>Récupération réelle (s)<input type="number" min="0" max="1800" value={actual.restSeconds ?? ''} disabled={workout.status !== 'started'} onChange={(event) => changeActual(index, 'restSeconds', event.target.value === '' ? '' : Number(event.target.value))} /></label>
+        <label>Charge réelle<input value={actual.load ?? ''} disabled={workout.status !== 'started'} placeholder="Ex. 8 kg" onChange={(event) => changeActual(index, 'load', event.target.value)} /></label>
+      </div>}
+      {actual.legacyResult && <p className="load-suggestion"><b>Résultat saisi avant cette mise à jour :</b> {actual.legacyResult}</p>}
+    </article>
+  }
+  const dateLabel = isValidDateKey(plan.scheduledFor) ? new Date(`${plan.scheduledFor}T12:00:00`).toLocaleDateString('fr-FR', { dateStyle: 'long' }) : ''
+  return <section className="workout-view">
+    <div className="section-heading workout-heading">
+      <button className="text-button" onClick={onBack}>← Calendrier</button>
+      <div><p className="eyebrow">{STATUS_LABELS[workout.status]?.toLocaleUpperCase('fr') || 'SÉANCE'}</p><h1>{plan.title}</h1><p className="muted">{OBJECTIVES.find((item) => item.id === plan.objective)?.label || plan.objective} · {plan.exercises.length} mouvements · {dateLabel}</p></div>
+      <span className={`status-badge ${workout.status}`}>{STATUS_LABELS[workout.status]}</span>
+    </div>
+    <div className="workout-tabs" role="tablist" aria-label="Détails de la séance">
+      <button role="tab" aria-selected={view === 'program'} className={view === 'program' ? 'active' : ''} onClick={() => setView('program')}>Programme prévu</button>
+      {(workout.status === 'started' || workout.status === 'completed') && <button role="tab" aria-selected={view === 'realization'} className={view === 'realization' ? 'active' : ''} onClick={() => setView('realization')}>Réalisation</button>}
+      {(workout.status === 'started' || workout.status === 'completed') && <button role="tab" aria-selected={view === 'notes'} className={view === 'notes' ? 'active' : ''} onClick={() => setView('notes')}>Notes</button>}
+    </div>
+    {view === 'program' && <>
+      <div className="workout-layout">
+        <section className="panel workout-preparation">
+          <div className="panel-heading"><h2>Préparation</h2><span className="badge">{locked ? 'Programme verrouillé' : 'Modifiable avant le départ'}</span></div>
+          <p>{plan.warmup?.description}</p><p className="note">{plan.safety}</p>
+          {plan.variationNote && <p className="variation-note">{plan.variationNote}</p>}
+          <label className="program-notes">Consignes complémentaires<textarea rows="3" maxLength="1000" value={workout.coachNotes || ''} disabled={locked} placeholder="Repères de séance, matériel, consignes de l’entraîneur…" onChange={(event) => onChange({ ...workout, coachNotes: event.target.value })} /></label>
+          {!locked && <ExerciseLibraryPicker objective={workout.objective} onSelect={addExercise} />}
+        </section>
+        {(locked ? plan.exercises : workout.exercises).map(planCard)}
+      </div>
+      {!locked && <div className="plan-actions panel">
+        <label>Déplacer la séance vers une autre date<input type="date" value={newDate} onChange={(event) => setNewDate(event.target.value)} /></label>
+        <button className="secondary" type="button" disabled={!isValidDateKey(newDate) || newDate === workout.scheduledFor} onClick={() => onReschedule(newDate)}>Enregistrer la nouvelle date</button>
+        <label>Statut<select value={workout.status} onChange={(event) => onStatusChange(event.target.value)}><option value="planned">Planifiée</option><option value="postponed">Reportée</option><option value="cancelled">Annulée</option></select></label>
+        <button className="danger" type="button" onClick={onDelete}>Supprimer la séance</button>
+      </div>}
+      {['planned', 'postponed'].includes(workout.status) && <div className="start-panel panel"><div><h2>La séance est prête ?</h2><p>Le programme sera verrouillé comme référence dès le démarrage. Vos performances seront saisies séparément.</p></div><button className="primary small" type="button" onClick={() => { onStart(); setView('realization') }}>Démarrer la réalisation</button></div>}
+    </>}
+    {view === 'realization' && <div className="workout-layout">
+      <section className="panel workout-preparation"><h2>Réalisation de la séance</h2><p>Les données ci-dessous sont indépendantes du programme prévu. Les modifications du programme sont maintenant verrouillées.</p></section>
+      {plan.exercises.map(actualCard)}
+      {workout.status === 'started' && <div className="completion-panel panel"><p>Vérifiez les performances saisies avant de valider. La validation clôture cette séance et conserve son historique.</p><button className="primary small" type="button" onClick={onComplete}>Valider la séance réalisée</button></div>}
+      {workout.status === 'completed' && <p className="notice-inline">Séance validée le {workout.completedAt ? new Date(workout.completedAt).toLocaleString('fr-FR') : '—'} · historique en lecture seule.</p>}
+    </div>}
+    {view === 'notes' && <section className="panel journal-panel">
+      <p className="eyebrow">CARNET D’ENTRAÎNEMENT</p><h2>Notes de séance</h2><p className="muted">Ces repères restent associés à la séance pour préparer les prochaines séances.</p>
+      <label>Sensations<textarea rows="3" maxLength="1500" value={workout.notes?.sensations || ''} disabled={workout.status !== 'started'} placeholder="Comment vous êtes-vous senti pendant la séance ?" onChange={(event) => updateNotes('sensations', event.target.value)} /></label>
+      <label>Niveau de fatigue<select value={workout.notes?.fatigue || ''} disabled={workout.status !== 'started'} onChange={(event) => updateNotes('fatigue', event.target.value)}><option value="">Non renseigné</option>{[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => <option key={level} value={String(level)}>{level} / 10</option>)}</select></label>
+      <label>Difficultés rencontrées<textarea rows="3" maxLength="1500" value={workout.notes?.difficulties || ''} disabled={workout.status !== 'started'} placeholder="Mouvement, charge ou contexte à surveiller…" onChange={(event) => updateNotes('difficulties', event.target.value)} /></label>
+      <label>Douleurs ou gênes<textarea rows="3" maxLength="1500" value={workout.notes?.discomfort || ''} disabled={workout.status !== 'started'} placeholder="Décrivez toute gêne ressentie, sans chercher à la diagnostiquer." onChange={(event) => updateNotes('discomfort', event.target.value)} /></label>
+      <label>Observations pour la suite<textarea rows="3" maxLength="1500" value={workout.notes?.observations || ''} disabled={workout.status !== 'started'} placeholder="Repères utiles pour votre prochaine séance…" onChange={(event) => updateNotes('observations', event.target.value)} /></label>
+      {workout.status === 'completed' && <p className="note">Séance validée : les notes sont conservées en lecture seule avec l’historique.</p>}
+    </section>}
+  </section>
+}
+
+function Calendar({ workouts, focusDate, onOpen, onDelete }) {
   const [month, setMonth] = useState(() => {
     const date = focusDate ? new Date(`${focusDate}T12:00:00`) : new Date()
     return new Date(date.getFullYear(), date.getMonth(), 1)
@@ -186,89 +456,58 @@ function Calendar({ workouts, focusDate, onOpen, onDelete, onValidate }) {
     const start = new Date(month.getFullYear(), month.getMonth(), 1)
     const end = new Date(month.getFullYear(), month.getMonth() + 1, 0)
     const offset = (start.getDay() + 6) % 7
-    return [...Array(offset).fill(null), ...Array.from(
-      { length: end.getDate() },
-      (_, index) => new Date(month.getFullYear(), month.getMonth(), index + 1),
-    )]
+    const cells = [...Array(offset).fill(null), ...Array.from({ length: end.getDate() }, (_, index) => new Date(month.getFullYear(), month.getMonth(), index + 1))]
+    while (cells.length % 7) cells.push(null)
+    return cells
   }, [month])
   const dayWorkouts = (day) => workouts.filter((workout) => workout.scheduledFor === localDateKey(day))
-
-  return (
-    <section>
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">CALENDRIER PERSONNEL</p>
-          <h1>Planifier et retrouver</h1>
-          <p className="muted">Ouvrez une séance pour l’ajuster ou validez-la ici une fois réalisée.</p>
-        </div>
-        <div className="row-actions">
-          <button className="secondary" aria-label="Mois précédent" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>←</button>
-          <strong>{month.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</strong>
-          <button className="secondary" aria-label="Mois suivant" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>→</button>
-        </div>
-      </div>
-      <div className="calendar-grid weekdays">{['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((day) => <span key={day}>{day}</span>)}</div>
-      <div className="calendar-grid">
-        {days.map((day, index) => (
-          <div className="calendar-day" key={day?.toISOString() || `empty-${index}`}>
-            {day && <>
-              <strong>{day.getDate()}</strong>
-              {dayWorkouts(day).map((workout) => (
-                <div className={`calendar-event ${workout.status}`} key={workout.id}>
-                  <button className="calendar-open" onClick={() => onOpen(workout.id)}>
-                    <b>{workout.status === 'completed' ? 'Réalisée' : 'Ouvrir'}</b>
-                    <span>{workout.title}</span>
-                  </button>
-                  <div className="calendar-event-actions">
-                    {workout.status !== 'completed' && <button className="calendar-validate" aria-label={`Valider ${workout.title}`} title="Valider la séance" onClick={() => onValidate(workout.id)}>Valider</button>}
-                    <button className="calendar-delete" aria-label={`Supprimer ${workout.title}`} onClick={() => onDelete(workout.id)}>×</button>
-                  </div>
-                </div>
-              ))}
-            </>}
-          </div>
-        ))}
-      </div>
-      {workouts.length === 0 && <Empty title="Votre calendrier est vide" text="Créez une séance datée depuis l’accueil pour commencer." />}
-    </section>
-  )
+  const monthKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`
+  const agendaWorkouts = workouts.filter((workout) => workout.scheduledFor?.startsWith(monthKey))
+    .sort((a, b) => a.scheduledFor.localeCompare(b.scheduledFor))
+  return <section className="calendar-section">
+    <div className="section-heading"><div><p className="eyebrow">PLANIFICATION</p><h1>Calendrier des séances</h1><p className="muted">Ouvrez une séance pour consulter le programme, saisir les résultats ou modifier sa date.</p></div>
+      <div className="month-controls"><button className="secondary" aria-label="Mois précédent" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>←</button><strong>{month.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</strong><button className="secondary" aria-label="Mois suivant" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>→</button></div>
+    </div>
+    <div className="status-legend">{Object.entries(STATUS_LABELS).map(([status, label]) => <span key={status}><i className={`status-dot ${status}`} />{label}</span>)}</div>
+    <div className="calendar-grid weekdays">{['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((day) => <span key={day}>{day}</span>)}</div>
+    <div className="calendar-grid">
+      {days.map((day, index) => <div className={`calendar-day ${day && localDateKey(day) === localDateKey(new Date()) ? 'today' : ''}`} key={day?.toISOString() || `empty-${index}`}>
+        {day && <><strong>{day.getDate()}</strong>{dayWorkouts(day).map((workout) => <article className={`calendar-event ${workout.status}`} key={workout.id}>
+          <button className="calendar-open" onClick={() => onOpen(workout.id)}><b>{STATUS_LABELS[workout.status] || 'Planifiée'}</b><span>{workout.title}</span></button>
+          <div className="calendar-event-actions"><button className="calendar-delete" aria-label={`Supprimer ${workout.title}`} title="Supprimer" onClick={() => onDelete(workout.id)}>×</button></div>
+        </article>)}</>}
+      </div>)}
+    </div>
+    <div className="calendar-agenda">
+      {agendaWorkouts.length ? agendaWorkouts.map((workout, index) => <div key={workout.id}>
+        {(index === 0 || agendaWorkouts[index - 1].scheduledFor !== workout.scheduledFor) && <p className="agenda-date">{new Date(`${workout.scheduledFor}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>}
+        <article className={`agenda-event ${workout.status}`}><button onClick={() => onOpen(workout.id)}><b>{STATUS_LABELS[workout.status] || 'Planifiée'}</b><span>{workout.title}</span></button><button className="calendar-delete" aria-label={`Supprimer ${workout.title}`} onClick={() => onDelete(workout.id)}>×</button></article>
+      </div>) : <p className="note">Aucune séance ce mois-ci.</p>}
+    </div>
+    {workouts.length === 0 && <Empty title="Votre calendrier est prêt" text="Créez une séance datée depuis l’accueil pour démarrer votre planification." />}
+  </section>
 }
+
 function History({ workouts, onOpen, onDelete }) {
-  const archived = workouts
-    .filter((workout) => workout.status === 'completed')
+  const archived = workouts.filter((workout) => workout.status === 'completed')
     .sort((a, b) => Date.parse(b.completedAt || b.createdAt || 0) - Date.parse(a.completedAt || a.createdAt || 0))
-
-  return (
-    <section>
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">HISTORIQUE</p>
-          <h1>Vos séances</h1>
-          <p className="muted">Retrouvez ici les séances dont vous avez validé la réalisation.</p>
-        </div>
-      </div>
-      {archived.length ? (
-        <div className="history-list">
-          {archived.map((workout) => {
-            const date = workout.completedAt || workout.createdAt
-            const dateLabel = date ? new Date(date).toLocaleDateString('fr-FR') : 'Date inconnue'
-            const statusLabel = workout.status === 'completed' ? 'Terminée' : 'À poursuivre'
-            return (
-              <article className="panel history-item" key={workout.id}>
-                <button className="history-open" onClick={() => onOpen(workout.id)}>
-                  <strong>{workout.title}</strong>
-                  <span>{dateLabel} · {workout.exercises.length} mouvements · {statusLabel}</span>
-                </button>
-                <button className="danger" onClick={() => onDelete(workout.id)}>Supprimer</button>
-              </article>
-            )
-          })}
-        </div>
-      ) : <Empty title="Aucune séance enregistrée" text="Validez la réalisation d’une séance depuis le calendrier pour la retrouver ici." />}
-    </section>
-  )
+  return <section className="history-section">
+    <div className="section-heading"><div><p className="eyebrow">CARNET DE SUIVI</p><h1>Historique des séances</h1><p className="muted">Programmes, performances réalisées et notes conservés ensemble.</p></div></div>
+    {archived.length ? <div className="history-list">{archived.map((workout) => <article className="panel history-item" key={workout.id}>
+      <button className="history-open" onClick={() => onOpen(workout.id)}><strong>{workout.title}</strong><span>{workout.completedAt ? new Date(workout.completedAt).toLocaleDateString('fr-FR') : 'Date inconnue'} · {workout.exercises.length} mouvements · séance réalisée</span></button>
+      <button className="danger" onClick={() => onDelete(workout.id)}>Supprimer</button>
+    </article>)}</div> : <Empty title="Aucune séance réalisée" text="Après une séance, renseignez les performances puis validez-la pour la retrouver ici." />}
+  </section>
 }
-function Settings({ data, onImport }) { return <section className="settings"><div className="section-heading"><div><p className="eyebrow">PARAMÈTRES & SAUVEGARDE</p><h1>Vos données restent à vous</h1></div></div><section className="panel"><h2>Stockage local</h2><p>Les données personnelles sont conservées dans IndexedDB sur cet appareil. Elles ne sont pas envoyées au serveur. Exportez régulièrement une sauvegarde avant de changer d’appareil ou de nettoyer les données du navigateur.</p><div className="row-actions"><button className="primary small" onClick={() => exportData(data)}>Exporter mes données</button><button className="secondary" onClick={onImport}>Importer une sauvegarde</button></div></section></section> }
+
+function Settings({ data, onImport }) {
+  return <section className="settings"><div className="section-heading"><div><p className="eyebrow">CONFIDENTIALITÉ & SAUVEGARDE</p><h1>Vos données restent à vous</h1></div></div>
+    <section className="panel"><h2>Stockage local</h2><p>Vos données personnelles sont conservées dans IndexedDB sur cet appareil et ne sont pas envoyées au serveur. Exportez régulièrement une sauvegarde avant de changer d’appareil ou de nettoyer les données du navigateur.</p>
+      <p className="note">{data.workouts.length} séances · sauvegarde au format JSON</p><div className="row-actions"><button className="primary small" onClick={() => exportData(data)}>Exporter mes données</button><button className="secondary" onClick={onImport}>Importer une sauvegarde</button></div>
+    </section>
+  </section>
+}
+
 function Empty({ title, text }) { return <section className="panel empty"><h2>{title}</h2><p>{text}</p></section> }
 
 export default App
