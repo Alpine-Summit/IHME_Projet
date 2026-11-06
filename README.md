@@ -2,74 +2,107 @@
 
 **Planifier le renforcement musculaire au service des sports d’endurance.**
 
-APEX Performance aide les sportifs et leurs entraîneurs à structurer des séances, suivre leur réalisation et conserver un historique de préparation. L’interface est en français et s’adapte aux écrans mobiles comme aux ordinateurs.
+APEX Performance est une application web en français destinée aux sportifs d’endurance et à leurs entraîneurs. Elle aide à préparer des séances de renforcement musculaire, à les retrouver dans un calendrier et à noter les résultats après l’entraînement.
 
-## Le besoin en une minute
+## En bref
 
-- **Utilisateur :** une personne en STAPS qui pratique le cyclisme, la course à pied ou le triathlon, ou qui accompagne un athlète.
-- **Problème :** les séances de renforcement, les réglages prévus et les résultats réalisés sont souvent dispersés. Il devient difficile de planifier régulièrement et de comparer les objectifs aux résultats.
-- **Entrées :** orientation (force, puissance, endurance musculaire, pliométrie ou renforcement général), groupes musculaires, date, masse corporelle facultative et ajustements des exercices.
-- **Résultat :** une séance structurée et datée, visible au calendrier, puis un suivi séparé de la réalisation et des notes de séance.
+Un sportif choisit une orientation de séance, les groupes musculaires à travailler et une date. L’application lui propose des exercices, des séries, des répétitions et des temps de récupération. Il peut ajuster le programme, l’enregistrer et le consulter dans son calendrier. Après avoir effectué la séance, il renseigne ses résultats et ses notes pour les garder dans son historique.
 
-### Scénario de démonstration
+## À qui s’adresse l’application ?
 
-1. Paul choisit « Force », cible les quadriceps, saisit une date et, s’il le souhaite, sa masse corporelle en kilogrammes.
-2. APEX propose une sélection d’exercices avec séries, répétitions, récupération et consignes modifiables.
-3. La séance est enregistrée avec le statut **Planifiée** et apparaît au calendrier.
-4. Le jour de la séance, Paul ouvre celle-ci, démarre la réalisation, saisit ses résultats et ses sensations, puis valide explicitement.
-5. Le programme prévu reste conservé comme référence de l’historique.
+Par exemple, Paul est étudiant en STAPS et pratique le cyclisme. Il souhaite organiser son renforcement en complément des sorties à vélo, sans perdre de vue les exercices prévus ni ses résultats passés. Son entraîneur peut aussi l’aider à préparer et à relire ses séances.
 
-## Fonctionnalités
+## Utiliser l’application
 
-- Séances datées avec orientation et sélection de groupes musculaires.
-- Bibliothèque d’exercices organisée et recherchable.
-- Séries, répétitions, repos, charges indicatives et consignes modifiables.
-- Calendrier mensuel, déplacement de séances planifiées et statuts distincts.
-- Verrouillage du programme au démarrage ; résultats réels et notes suivis séparément.
-- Historique, import et export d’une sauvegarde JSON.
-- Interface responsive et données locales conservées dans le navigateur.
+1. Depuis **Créer**, choisir une orientation : force, puissance, endurance musculaire, pliométrie ou renforcement général.
+2. Choisir les groupes musculaires, une date et, si souhaité, un titre et une masse corporelle.
+3. Créer la séance. APEX propose une sélection d’exercices avec des consignes, des séries, des répétitions et des récupérations que l’on peut modifier.
+4. Retrouver la séance **Planifiée** dans le **Calendrier**. Une séance planifiée peut être déplacée à une autre date ou modifiée.
+5. Le jour de l’entraînement, ouvrir la séance et démarrer sa réalisation. Le programme prévu est alors conservé comme référence ; les résultats réellement effectués sont saisis séparément.
+6. Noter ses sensations et valider la séance explicitement. La séance réalisée est ensuite consultable dans l’**Historique**.
+7. Dans **Sauvegarde**, exporter ou importer un fichier JSON pour conserver ou transférer ses données.
 
-## Architecture et circulation des données
+## Ce que propose APEX
+
+- Création de séances selon un objectif sportif et des groupes musculaires.
+- Bibliothèque d’exercices classée par catégories et dotée d’une recherche.
+- Réglage des séries, répétitions, charges indicatives, récupérations et consignes.
+- Calendrier mensuel, déplacement de séances planifiées et statuts **Planifiée**, **En cours**, **Réalisée**, **Reportée** et **Annulée**.
+- Séparation entre le programme prévu et les résultats réellement effectués.
+- Notes de séance, historique, import et export JSON.
+- Interface adaptée aux téléphones, aux tablettes et aux ordinateurs.
+
+## Comment les données sont-elles conservées ?
+
+### Dans l’interface web
+
+Le parcours principal de l’application conserve le profil et les séances dans **IndexedDB**, une base de données du navigateur. Les données restent sur l’appareil et dans le navigateur utilisés : elles ne sont pas automatiquement envoyées vers PostgreSQL. Pour les transférer vers un autre appareil ou les sauvegarder à part, utiliser **Exporter** ou l’onglet **Sauvegarde**, puis conserver le fichier JSON dans un endroit sûr.
+
+Effacer les données du navigateur peut supprimer cette copie locale. Exporter une sauvegarde avant de changer d’appareil ou de nettoyer les données du navigateur.
+
+### Côté serveur
+
+Le projet comprend également une API Node.js/Express avec des routes de comptes et de séances, ainsi qu’une base PostgreSQL. **Cette API est distincte du parcours de l’interface React : l’application web ne propose pas de connexion utilisateur et ne synchronise pas ses séances locales avec l’API.** Les séances enregistrées depuis l’interface et celles enregistrées directement par les routes API ne constituent donc pas une seule sauvegarde partagée.
+
+En particulier, l’API PostgreSQL enregistre une programmation simplifiée. Elle ne conserve pas encore l’intégralité du programme verrouillé, les performances réelles détaillées pour chaque exercice ni le carnet de notes de l’interface.
+
+## Technologies et organisation du projet
+
+- **React 19** et **Vite** : interface web et serveur de développement.
+- **Node.js 24** et **Express 5** : serveur web et API.
+- **PostgreSQL 16** : stockage utilisé par les routes API du backend.
+- **Docker Compose** : lancement de l’application et de PostgreSQL.
 
 ```text
-React + Vite (frontend/src)
-  ├─ formulaire, calendrier, suivi et historique
-  ├─ moteur de séances (frontend/src/engine)
-  └─ sauvegarde principale du navigateur (IndexedDB)
+frontend/src/
+  App.jsx                 Pages, calendrier et parcours de séance
+  engine/                 Génération et cycle de vie des séances
+  storage/                Sauvegarde IndexedDB et import/export JSON
+  data/                   Bibliothèque d’exercices
 
-Node.js + Express (backend/server.js)
-  ├─ API REST, comptes et sessions
-  ├─ génération d’une séance via le moteur partagé
-  └─ requêtes PostgreSQL avec paramètres
+backend/
+  server.js               Serveur Express et routes API
+  planner.js              Génération des séances côté serveur
 
-PostgreSQL (database/init.sql) ← Docker Compose (app + db)
+database/init.sql         Schéma et données initiales PostgreSQL
+docker-compose.yml        Services app et db
 ```
 
-Le parcours React actuel conserve son profil et ses séances dans **IndexedDB** sur l’appareil utilisé. Le serveur Node.js expose séparément des routes API authentifiées qui stockent les comptes, profils et séances de l’API dans PostgreSQL. **La connexion, la synchronisation cloud et la sauvegarde des réalisations depuis l’interface React ne sont pas encore implémentées** : les données créées dans l’interface ne sont donc pas envoyées à PostgreSQL et ne sont pas synchronisées entre appareils. Exportez régulièrement vos données depuis l’onglet **Sauvegarde**.
+Le moteur de séances s’appuie sur l’orientation, les muscles choisis, le profil et les séances récentes. Il essaie de proposer quatre à six exercices, et peut en ajouter pour couvrir tous les groupes demandés. Les suggestions de charge sont des repères indicatifs, modifiables par l’utilisateur.
 
-### Technologies
+## Le serveur et ses règles
 
-- **React 19** et **Vite** : interface et développement frontend.
-- **Node.js 24** et **Express 5** : serveur web et API.
-- **PostgreSQL 16** : données du backend.
-- **Docker Compose** : démarrage coordonné du serveur et de la base.
+L’API est un service complémentaire du site. Elle est disponible pour les tests ou les intégrations qui l’appellent directement, mais l’interface React ne l’utilise pas pour sauvegarder le profil ou les séances.
 
-## Modèle de données
+| Route API | Fonction |
+|---|---|
+| `GET /api/health` | Vérifier si le serveur et PostgreSQL répondent |
+| `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout` | Créer un compte API, ouvrir ou fermer une session |
+| `GET /api/me`, `PUT /api/profile` | Lire ou mettre à jour le profil associé au compte API |
+| `GET /api/exercises?objective=force` | Consulter les exercices correspondant à une orientation |
+| `POST /api/workouts`, `GET /api/workouts` | Générer, enregistrer ou lister des séances API |
+| `PATCH /api/workouts/:id/status` | Modifier le statut d’une séance API |
 
-Le schéma complet et son initialisation sont dans [`database/init.sql`](./database/init.sql).
+Lorsqu’une demande de création de séance arrive à l’API, le serveur vérifie l’orientation et le titre, demande au moteur de préparer une séance à partir des exercices enregistrés dans PostgreSQL, puis écrit la séance et ses exercices en base. La date de programmation est obligatoire. Une masse corporelle renseignée doit être comprise entre 20 et 300 kg. Les requêtes SQL utilisent des paramètres plutôt que d’insérer directement les valeurs dans le texte de la requête.
 
-| Table | Clé et relation | Données principales |
+Ces routes ne remplacent pas IndexedDB pour l’interface : créer une séance dans le site ne déclenche pas actuellement `POST /api/workouts`.
+
+## Modèle de données PostgreSQL
+
+Le schéma est défini dans [`database/init.sql`](./database/init.sql).
+
+| Table | Clé principale et relations | Rôle |
 |---|---|---|
-| `users` | `id` clé primaire ; `email` unique | Compte et empreinte du mot de passe |
-| `sessions` | `id` clé primaire ; `user_id` référence `users.id` | Empreinte de session et date d’expiration |
-| `profiles` | `user_id` clé primaire et référence `users.id` | Prénom, masse et préférences |
-| `exercises` | `id` clé primaire ; `name` unique | Groupes musculaires, objectifs et équipement |
-| `workouts` | `id` clé primaire ; `user_id` référence `users.id` | Titre, orientation, date, statut et notes |
-| `workout_exercises` | Clé composée `(workout_id, order_index)` | Exercices ordonnés reliés à une séance et à `exercises.id` |
+| `users` | `id` ; adresse e-mail unique | Comptes utilisés par l’API |
+| `sessions` | `id` ; `user_id` référence `users.id` | Sessions de connexion de l’API |
+| `profiles` | `user_id` référence `users.id` | Profil associé à un compte API |
+| `exercises` | `id` ; nom unique | Catalogue d’exercices du backend |
+| `workouts` | `id` ; `user_id` référence `users.id` | Séances enregistrées par l’API |
+| `workout_exercises` | Clé composée `(workout_id, order_index)` | Exercices ordonnés d’une séance API |
 
-Une séance peut contenir plusieurs exercices et un même exercice peut apparaître dans plusieurs séances : `workout_exercises` porte cette relation et l’ordre des mouvements. Les unités sont explicites : `body_mass` en kilogrammes, `sets` en nombre de séries, `reps` en texte pour accepter une plage ou un format, `rest_seconds` en secondes, `load_percentage` en pourcentage, et `scheduled_for` en date.
+Une séance peut contenir plusieurs exercices, et un exercice peut être utilisé dans plusieurs séances. La table `workout_exercises` enregistre cette association et l’ordre des exercices. Les champs prévus par le schéma utilisent notamment les kilogrammes pour la masse corporelle et les secondes pour la récupération.
 
-Exemple : afficher les mouvements d’une séance d’un utilisateur, dans l’ordre prévu. `$1` et `$2` sont transmis comme paramètres par le client PostgreSQL, et non concaténés dans la requête.
+Exemple de requête : afficher les exercices d’une séance API dans l’ordre prévu. `$1` et `$2` sont des paramètres transmis séparément à PostgreSQL.
 
 ```sql
 SELECT w.title,
@@ -86,81 +119,60 @@ WHERE w.user_id = $1 AND w.id = $2
 ORDER BY we.order_index;
 ```
 
-## API et règles métier
-
-Le serveur expose notamment :
-
-| Route | Utilité |
-|---|---|
-| `GET /api/health` | Vérifier le serveur et l’état de la connexion PostgreSQL |
-| `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout` | Créer et gérer une session |
-| `GET /api/me`, `PUT /api/profile` | Lire le compte et mettre à jour le profil |
-| `GET /api/exercises?objective=force` | Filtrer le catalogue par objectif |
-| `POST /api/workouts`, `GET /api/workouts` | Générer, enregistrer et lister les séances de l’API |
-| `PATCH /api/workouts/:id/status` | Mettre à jour le statut d’une séance enregistrée |
-
-Le moteur partagé (`frontend/src/engine/workoutEngine.js`) contrôle l’objectif, la date ISO, le titre (100 caractères maximum), le prénom (40 caractères maximum) et la masse (20 à 300 kg si elle est renseignée). Il privilégie les muscles choisis et tient compte des séances récentes. Il propose généralement quatre à six exercices ; il peut en sélectionner davantage pour couvrir tous les groupes demandés. Les suggestions de charge restent indicatives et modifiables.
-
-Exemple reproductible vérifié avec le moteur :
-
-```js
-generateWorkout(
-  { bodyMass: 70, muscles: ['Quadriceps'] },
-  { objective: 'force', scheduledFor: '2026-11-06' }
-)
-```
-
-Résultat vérifié : titre « Force · séance personnalisée », date `2026-11-06`, statut `planned` (affiché « Planifiée ») et six exercices. Sans groupe musculaire sélectionné, l’objectif général produit quand même une séance. Une date manquante ou impossible et une masse hors limites sont rejetées avec un message explicite.
-
-Dans le schéma PostgreSQL, le statut initial d’une nouvelle séance est également `planned`. Les routes API actuelles enregistrent une programmation simplifiée ; elles ne sauvegardent pas encore l’instantané immuable du programme, les résultats réalisés exercice par exercice ni les notes du carnet de l’interface.
-
-## Installation et lancement
-
-### Lancement complet avec Docker
+## Lancer l’application avec Docker
 
 Prérequis : Docker Desktop avec Docker Compose.
+
+À la racine du dépôt :
 
 ```bash
 cp .env.example .env
 ```
 
-Pour un usage local, remplacez `POSTGRES_PASSWORD` dans `.env` par un mot de passe local. Le fichier `.env` est ignoré par Git et ne doit jamais être publié. Les valeurs d’exemple sont réservées au développement.
+Les valeurs de `.env.example` sont destinées au développement local. Pour une installation locale, modifier `POSTGRES_PASSWORD` dans `.env`. Ne pas publier ce fichier ni réutiliser ces valeurs en production.
 
 ```bash
 docker compose up --build -d
 docker compose ps
 ```
 
-Ouvrir [http://localhost:3000](http://localhost:3000). Vérifier l’API et PostgreSQL :
+Ouvrir [http://localhost:3000](http://localhost:3000). Vérifier que le serveur communique avec PostgreSQL :
 
 ```bash
 curl http://localhost:3000/api/health
 ```
 
-Une réponse `{"status":"ok","database":"connected"}` confirme que le serveur communique avec PostgreSQL. Pour arrêter les services sans supprimer les données :
+Une réponse `{"status":"ok","database":"connected"}` confirme la connexion. Pour arrêter les services sans effacer le volume de la base :
 
 ```bash
 docker compose down
 ```
 
-La suppression du volume PostgreSQL efface définitivement les données de cette installation locale ; ne lancez `docker compose down -v` que si cette suppression est voulue.
+`docker compose down -v` supprime également le volume PostgreSQL et les données qu’il contient. Ne l’utiliser que si cet effacement est volontaire.
 
-### Développement frontend
+## Développement sans Docker
 
-Prérequis : Node.js 24 et npm.
+Prérequis : Node.js 24 et npm. Pour lancer le serveur web et le frontend :
 
 ```bash
 npm ci
 npm ci --prefix frontend
 npm run build
-npm run dev
 ```
 
-Le serveur est disponible sur `http://localhost:3000`. Pour le rechargement à chaud du frontend, lancez aussi `npm run dev:frontend` dans un second terminal ; Vite démarre sur `http://localhost:5173`. Les routes `/api` de Vite sont redirigées vers le serveur Node local.
+Le backend a besoin de PostgreSQL. Pour le développement, on peut lancer la base avec Docker Compose, puis lancer les serveurs Node et Vite dans deux terminaux :
+
+```bash
+docker compose up -d db
+npm run dev
+npm run dev:frontend
+```
+
+Le serveur Express démarre sur `http://localhost:3000` et Vite sur `http://localhost:5173`. Le proxy Vite transmet les appels `/api` à Express. Le parcours principal de l’interface reste néanmoins stocké dans IndexedDB, et non dans PostgreSQL.
 
 ## Vérifications
 
-Commandes automatisées à la racine :
+Depuis la racine du dépôt :
 
 ```bash
 npm test
@@ -169,35 +181,26 @@ npm run build
 docker compose --env-file .env.example config -q
 ```
 
-Résultats de vérification effectués le 6 novembre 2026 :
+Les tests automatisés portent sur le moteur de génération, les règles de réalisation des séances et l’import/export des sauvegardes. Ils ne remplacent pas une démonstration de l’interface avec une autre personne.
 
-- **Tests Node.js :** 21 réussis, 0 échec (moteur, cycle de vie, imports/exports et adaptateur de génération).
-- **ESLint :** réussi.
-- **Build Vite de production :** réussi.
-- **Docker Compose :** configuration valide ; les deux conteneurs sont devenus sains.
-- **API avec PostgreSQL réel en conteneurs :** health `200`, inscription `200`, profil `200`, création `201`, liste `200` avec le même identifiant PostgreSQL que la création, mise à jour du statut `200`. Une masse de `301 kg` et une date absente ont été rejetées (`400`).
+| Essai | Entrée | Résultat attendu |
+|---|---|---|
+| Parcours normal | Créer une séance de force avec une date et des quadriceps sélectionnés | Une séance datée, avec des exercices et le statut **Planifiée** |
+| Sélection vide | Renforcement général, date valide, aucun muscle choisi | Une séance générale peut quand même être créée |
+| Limite de profil | Masse corporelle de 300 kg, puis 301 kg | 300 kg est accepté ; 301 kg est refusé avec une erreur |
+| Date invalide | Date absente ou date impossible | La création est refusée et l’utilisateur reçoit une erreur |
+| Réalisation | Démarrer une séance, modifier les résultats réellement effectués, puis valider | Le programme initial reste conservé et les résultats apparaissent dans l’historique |
 
-| Essai | Entrée | Résultat attendu | Résultat obtenu |
-|---|---|---|---|
-| Normal | Force, quadriceps, date `2026-11-06`, masse `70 kg` | Séance datée, statut planifié et exercices proposés | Conforme ; six exercices avec le moteur |
-| Vide | Aucun groupe musculaire sélectionné, objectif général et date valide | Une séance générale reste générable | Conforme ; test automatisé réussi |
-| Limite | Masse `300 kg` puis `301 kg` | `300 kg` accepté ; `301 kg` refusé | Conforme dans les tests moteur ; l’API a également refusé `301 kg` |
-| Date invalide | Date absente ou `2026-02-31` | Erreur compréhensible ; aucune séance ajoutée | Conforme ; tests moteur et API réussis |
+Au dernier contrôle, les 21 tests automatisés passent, ESLint et le build de production réussissent, et la configuration Docker Compose est valide. Le parcours API PostgreSQL a également été vérifié : health check, inscription, lecture du profil, création et liste d’une séance. Les entrées invalides testées (masse de 301 kg et date manquante) sont refusées. La démonstration complète de l’interface à un autre utilisateur et l’évaluation par l’enseignant restent à effectuer.
 
-Les contrôles UI et la démonstration devant un enseignant restent à rejouer dans le contexte de présentation. Cette évaluation humaine facultative n’est pas calculée à partir des commits ni des tests automatisés.
+Pour la présentation, expliquer le besoin de Paul, réaliser le parcours principal, montrer comment le moteur propose les exercices, puis décrire où les données sont sauvegardées. Il est également utile de montrer une sauvegarde JSON et un test avec une entrée invalide.
 
-## Déploiement et démonstration
+## Limites connues
 
-Le workflow GitHub Actions [`publish.yml`](./.github/workflows/publish.yml) vérifie le code, construit l’image Docker et la publie dans GitHub Container Registry lors d’un push sur `main` ou `master`. Le déploiement vers un hébergeur n’est déclenché que manuellement et nécessite la configuration de `IHME_DEPLOY_URL`, `IHME_DEPLOY_TOKEN` et `IHME_BASE_PATH` dans les paramètres du dépôt. Aucun lien public de production n’est actuellement configuré.
+- Les données du parcours React sont locales au navigateur. Il n’y a pas de synchronisation entre appareils.
+- Les routes API et leur stockage PostgreSQL existent, mais ils ne sont pas reliés au parcours principal de l’interface.
+- Les détails complets de la réalisation d’une séance et les notes de l’interface ne sont pas persistés dans PostgreSQL.
+- Aucune instance publique de production n’est actuellement configurée. Le workflow GitHub Actions peut construire et publier une image ; le déploiement vers un hébergeur nécessite une configuration supplémentaire.
+- La démonstration et l’évaluation facultative par un enseignant doivent être effectuées par une personne ; elles ne peuvent pas être évaluées automatiquement par ce dépôt.
 
-Pour présenter le fonctionnement en deux minutes :
-
-1. Décrire le besoin de Paul et réaliser la planification d’une séance dans React.
-2. Expliquer que `generateWorkout` contrôle les entrées puis sélectionne et prescrit les exercices.
-3. Montrer que l’interface conserve actuellement les données dans IndexedDB.
-4. Montrer séparément l’API Express, la requête paramétrée PostgreSQL et le contrôle `/api/health` sous Docker.
-5. Présenter les essais normal, vide et limite ci-dessus, puis signaler la limite de synchronisation entre le frontend et l’API.
-
-**Limite et amélioration prioritaire :** connecter l’interface React à l’authentification et aux routes PostgreSQL, puis étendre le modèle API pour conserver les instantanés programmés, les réalisations détaillées et les notes par exercice. En attendant, l’IndexedDB locale et l’export JSON restent le stockage effectif du parcours web.
-
-Les charges proposées ne constituent pas un avis médical. Interrompez un mouvement en cas de douleur et adaptez la séance à votre situation.
+Les charges proposées ne constituent pas un avis médical. Interrompre un mouvement en cas de douleur et adapter la séance à sa situation.
