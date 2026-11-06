@@ -201,6 +201,4 @@ Pour la présentation, expliquer le besoin de Paul, réaliser le parcours princi
 - Les routes API et leur stockage PostgreSQL existent, mais ils ne sont pas reliés au parcours principal de l’interface.
 - Les détails complets de la réalisation d’une séance et les notes de l’interface ne sont pas persistés dans PostgreSQL.
 - Aucune instance publique de production n’est actuellement configurée. Le workflow GitHub Actions peut construire et publier une image ; le déploiement vers un hébergeur nécessite une configuration supplémentaire.
-- La démonstration et l’évaluation facultative par un enseignant doivent être effectuées par une personne ; elles ne peuvent pas être évaluées automatiquement par ce dépôt.
-
 Les charges proposées ne constituent pas un avis médical. Interrompre un mouvement en cas de douleur et adapter la séance à sa situation.
