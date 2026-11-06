@@ -78,7 +78,7 @@ Le moteur de séances s’appuie sur l’orientation, les muscles choisis, le pr
 
 ## Le serveur et ses règles
 
-L’API est un service complémentaire du site. L’interface l’utilise pour l’inscription, la connexion et, sur demande, l’envoi des séances locales au compte. Le profil de l’application reste local.
+L’API est un service complémentaire du site. L’interface l’utilise pour l’inscription, la connexion et la synchronisation des séances. Après l’ouverture de l’application avec une session active, la synchronisation démarre automatiquement dès que le réseau et le serveur sont disponibles. Elle peut aussi être lancée manuellement depuis **Sauvegarde**. Le profil de l’application reste local.
 
 | Route API | Fonction |
 |---|---|
@@ -202,7 +202,7 @@ Les tests automatisés portent sur le moteur de génération, les règles de ré
 | Récupération sur un autre appareil | Se connecter au même compte dans un autre navigateur, puis ouvrir l’application | Les séances du compte apparaissent automatiquement dans le calendrier et l’historique |
 | Hors connexion / reprise | Créer ou modifier une séance sans réseau, puis rétablir le réseau | Les séances restent disponibles localement et la synchronisation reprend automatiquement |
 
-Au dernier contrôle, les 29 tests automatisés passent, ESLint et le build de production réussissent, et la configuration Docker Compose est valide. Un test de bout en bout avec une instance PostgreSQL Docker isolée a vérifié la migration depuis l’ancien schéma, l’inscription, l’envoi et la récupération d’une séance depuis deux sessions de compte, la mise à jour sans doublon, la résolution d’une modification concurrente et la protection d’une séance réalisée avec ses résultats et ses notes. La démonstration complète de l’interface à un autre utilisateur et l’évaluation par l’enseignant restent à effectuer.
+La suite comprend 30 tests automatisés couvrant le moteur de génération, le cycle de vie des séances, la synchronisation et l’import/export. Un test de bout en bout avec PostgreSQL isolé a vérifié la migration depuis l’ancien schéma, la création de compte, l’envoi et la récupération des séances, la mise à jour sans doublon, la résolution de modifications concurrentes et la protection d’une séance réalisée. Lors de la vérification manuelle finale, une séance locale a été envoyée automatiquement depuis un premier navigateur puis récupérée dans un second ; le service de santé a répondu normalement. Les pages principales ont été contrôlées à une largeur mobile de 390 px sans débordement horizontal. Les quatre commandes ci-dessus vérifient les tests, le lint, le build frontend et la configuration Docker Compose. Une démonstration du parcours à un autre utilisateur et l’évaluation par l’enseignant restent à effectuer.
 
 Pour la présentation, expliquer le besoin de Paul, réaliser le parcours principal, montrer comment le moteur propose les exercices, puis décrire où les données sont sauvegardées. Il est également utile de montrer une sauvegarde JSON et un test avec une entrée invalide.
 
